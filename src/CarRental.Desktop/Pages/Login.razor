@@ -6,17 +6,32 @@
     <h1>Car Rental</h1>
     <p class="subtitle">Login (example view)</p>
 
-    <EditForm Model="this">
+    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
         <div class="field">
             <label for="email">Email</label>
-            <InputText id="email" class="input" />
+            <InputText id="email" class="input" @bind-Value="_model.Email" />
         </div>
 
         <div class="field">
             <label for="password">Password</label>
-            <InputText id="password" class="input" type="password" />
+            <InputText id="password" class="input" type="password" @bind-Value="_model.Password" />
         </div>
 
         <button type="submit" class="button">Sign in</button>
     </EditForm>
 </div>
+
+@code {
+    private readonly LoginViewModel _model = new();
+
+    private static void HandleSubmit()
+    {
+    }
+
+    private sealed class LoginViewModel
+    {
+        public string Email { get; set; } = string.Empty;
+
+        public string Password { get; set; } = string.Empty;
+    }
+}
