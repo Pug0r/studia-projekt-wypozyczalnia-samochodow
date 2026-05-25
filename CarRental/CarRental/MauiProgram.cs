@@ -1,4 +1,8 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.Storage;
+using CarRental.Data;
 
 namespace CarRental;
 
@@ -13,11 +17,24 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
+        var dbPath = Path.Combine(FileSystem.AppDataDirectory, "carrental.db");
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlite($"Data Source={dbPath}"));
+
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
 
-        return builder.Build();
+        var app = builder.Build();
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            dbContext.Database.EnsureCreated();
+            DbSeeder.SeedAsync(dbContext, enable: true).GetAwaiter().GetResult();
+        }
+
+        return app;
     }
 }

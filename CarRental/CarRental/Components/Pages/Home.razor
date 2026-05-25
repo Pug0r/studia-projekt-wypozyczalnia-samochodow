@@ -1,5 +1,51 @@
 ﻿@page "/"
 
-<h1>Hello, world!</h1>
+@using CarRental.Models
+@using Microsoft.EntityFrameworkCore
+@inject CarRental.Data.AppDbContext DbContext
 
-Welcome to your new app.
+<h1>Available cars</h1>
+
+@if (cars is null)
+{
+    <p>Loading cars...</p>
+}
+else if (cars.Count == 0)
+{
+    <p>No cars available.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Make</th>
+            <th>Model</th>
+            <th>Year</th>
+            <th>Daily rate</th>
+            <th>Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var car in cars)
+        {
+            <tr>
+                <td>@car.Make</td>
+                <td>@car.Model</td>
+                <td>@car.Year</td>
+                <td>@car.DailyRate.ToString("C")</td>
+                <td>@(car.IsAvailable ? "Available" : "Rented")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Car>? cars;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cars = await DbContext.Cars.AsNoTracking().ToListAsync();
+    }
+}
