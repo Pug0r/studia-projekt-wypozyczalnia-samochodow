@@ -1,4 +1,7 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@inject AuthService Auth
+@inject NavigationManager Nav
+@implements IDisposable
 
 <div class="page">
     <div class="sidebar">
@@ -6,8 +9,12 @@
     </div>
 
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        <div class="top-row px-4 d-flex align-items-center justify-content-end">
+            @if (Auth.IsAuthenticated)
+            {
+                <span class="user-greeting">Hello @Auth.CurrentUser!.Username!</span>
+                <button class="btn btn-logout" @onclick="Logout">Logout</button>
+            }
         </div>
 
         <article class="content px-4">
@@ -15,3 +22,20 @@
         </article>
     </main>
 </div>
+
+@code {
+    protected override void OnInitialized()
+        => Auth.AuthStateChanged += OnAuthChanged;
+
+    private void OnAuthChanged()
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+        => Auth.AuthStateChanged -= OnAuthChanged;
+
+    private void Logout()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login");
+    }
+}

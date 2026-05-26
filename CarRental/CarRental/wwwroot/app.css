@@ -1,3 +1,9 @@
+:root {
+    --brand-primary:      #1b6ec2;
+    --brand-primary-dark: #1558a0;
+    --brand-primary-border: #1861ac;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }

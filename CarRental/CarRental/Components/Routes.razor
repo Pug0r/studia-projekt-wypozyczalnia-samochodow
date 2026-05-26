@@ -1,4 +1,8 @@
-﻿<Router AppAssembly="typeof(MauiProgram).Assembly">
+@inject AuthService Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+<Router AppAssembly="typeof(MauiProgram).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)"/>
         <FocusOnNavigate RouteData="routeData" Selector="h1"/>
@@ -9,3 +13,26 @@
         </LayoutView>
     </NotFound>
 </Router>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Auth.AuthStateChanged += OnAuthChanged;
+        RedirectIfUnauthenticated();
+    }
+
+    private void OnAuthChanged()
+        => InvokeAsync(() =>
+        {
+            RedirectIfUnauthenticated();
+            StateHasChanged();
+        });
+
+    private void RedirectIfUnauthenticated()
+    {
+        if (!Auth.IsAuthenticated && !new Uri(Nav.Uri).AbsolutePath.Equals("/login", StringComparison.OrdinalIgnoreCase))
+            Nav.NavigateTo("/login");
+    }
+
+    public void Dispose() => Auth.AuthStateChanged -= OnAuthChanged;
+}

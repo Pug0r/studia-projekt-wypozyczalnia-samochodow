@@ -36,6 +36,29 @@ main {
         text-overflow: ellipsis;
     }
 
+.user-greeting {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #495057;
+    margin-right: 1rem;
+}
+
+.btn-logout {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary-border);
+    color: #fff;
+    font-size: 0.875rem;
+    padding: 0.3rem 1rem;
+    border-radius: 6px;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn-logout:hover {
+    background-color: var(--brand-primary-dark);
+    border-color: var(--brand-primary-dark);
+    color: #fff;
+}
+
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;

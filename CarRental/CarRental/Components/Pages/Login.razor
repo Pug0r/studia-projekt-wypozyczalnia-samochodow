@@ -1,0 +1,113 @@
+@page "/login"
+@layout EmptyLayout
+
+@inject AuthService Auth
+@inject NavigationManager Nav
+
+<div class="login-container">
+    <div class="login-card">
+        <h2 class="login-title">CarRental</h2>
+
+        <div class="login-tabs">
+            <button class="tab-btn @(isLogin ? "active" : "")" @onclick="() => SwitchTab(true)">Login</button>
+            <button class="tab-btn @(!isLogin ? "active" : "")" @onclick="() => SwitchTab(false)">Register</button>
+        </div>
+
+        @if (isLogin)
+        {
+            <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                <div class="form-grid">
+                    <label class="field-label">Username</label>
+                    <InputText class="form-control" @bind-Value="loginModel.Username" />
+
+                    <label class="field-label">Password</label>
+                    <InputText class="form-control" type="password" @bind-Value="loginModel.Password" />
+                </div>
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="form-error">@errorMessage</div>
+                }
+                <div class="login-btn-row">
+                    <button type="submit" class="btn login-btn">Login</button>
+                </div>
+            </EditForm>
+        }
+        else
+        {
+            <EditForm Model="registerModel" OnValidSubmit="HandleRegister">
+                <div class="form-grid">
+                    <label class="field-label">Username</label>
+                    <InputText class="form-control" @bind-Value="registerModel.Username" />
+
+                    <label class="field-label">Password</label>
+                    <InputText class="form-control" type="password" @bind-Value="registerModel.Password" />
+
+                    <label class="field-label">Confirm Password</label>
+                    <InputText class="form-control" type="password" @bind-Value="registerModel.Confirm" />
+                </div>
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="form-error">@errorMessage</div>
+                }
+                <div class="login-btn-row">
+                    <button type="submit" class="btn login-btn">Register</button>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    private bool isLogin = true;
+    private string? errorMessage;
+
+    private readonly LoginFormModel loginModel = new();
+    private readonly RegisterFormModel registerModel = new();
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsAuthenticated)
+            Nav.NavigateTo("/");
+    }
+
+    private void SwitchTab(bool login)
+    {
+        isLogin = login;
+        errorMessage = null;
+    }
+
+    private async Task HandleLogin()
+    {
+        errorMessage = await Auth.LoginAsync(loginModel.Username, loginModel.Password);
+
+        if (errorMessage is null)
+            Nav.NavigateTo("/");
+    }
+
+    private async Task HandleRegister()
+    {
+        if (registerModel.Password != registerModel.Confirm)
+        {
+            errorMessage = "Passwords do not match.";
+            return;
+        }
+
+        errorMessage = await Auth.RegisterAsync(registerModel.Username, registerModel.Password);
+
+        if (errorMessage is null)
+            Nav.NavigateTo("/");
+    }
+
+    private sealed class LoginFormModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+
+    private sealed class RegisterFormModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string Confirm  { get; set; } = string.Empty;
+    }
+}
