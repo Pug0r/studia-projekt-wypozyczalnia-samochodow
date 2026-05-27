@@ -16,9 +16,10 @@ public sealed class AppDbContext : DbContext
     {
         modelBuilder.Entity<Car>(entity =>
         {
-            entity.Property(e => e.Make).HasMaxLength(100);
+            entity.Property(e => e.Brand).HasMaxLength(100);
             entity.Property(e => e.Model).HasMaxLength(100);
             entity.Property(e => e.DailyRate).HasPrecision(10, 2);
+            entity.Property(e => e.Faults).HasMaxLength(200);
         });
 
         modelBuilder.Entity<User>(entity =>

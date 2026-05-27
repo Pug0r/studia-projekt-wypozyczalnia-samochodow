@@ -13,10 +13,10 @@ public static class DbSeeder
         if (!await dbContext.Cars.AnyAsync())
         {
             dbContext.Cars.AddRange(
-                new Car { Make = "Toyota",     Model = "Corolla",  Year = 2021, DailyRate = 129.00m, IsAvailable = true  },
-                new Car { Make = "Skoda",      Model = "Octavia",  Year = 2022, DailyRate = 149.00m, IsAvailable = true  },
-                new Car { Make = "Volkswagen", Model = "Golf",     Year = 2020, DailyRate = 119.00m, IsAvailable = false },
-                new Car { Make = "Kia",        Model = "Sportage", Year = 2023, DailyRate = 189.00m, IsAvailable = true  }
+                new Car { Brand = "Toyota",     Model = "Corolla",  Year = 2021, DailyRate = 129.00m, IsAvailable = true,  Mileage = 45000, Faults = ""                    },
+                new Car { Brand = "Skoda",      Model = "Octavia",  Year = 2022, DailyRate = 149.00m, IsAvailable = true,  Mileage = 22000, Faults = ""                    },
+                new Car { Brand = "Volkswagen", Model = "Golf",     Year = 2020, DailyRate = 119.00m, IsAvailable = false, Mileage = 78000, Faults = "Minor scratch on bumper" },
+                new Car { Brand = "Kia",        Model = "Sportage", Year = 2023, DailyRate = 189.00m, IsAvailable = true,  Mileage =  8500, Faults = ""                    }
             );
             await dbContext.SaveChangesAsync();
         }

@@ -19,7 +19,7 @@ else
     <table class="table">
         <thead>
         <tr>
-            <th>Make</th>
+            <th>Brand</th>
             <th>Model</th>
             <th>Year</th>
             <th>Daily rate</th>
@@ -30,7 +30,7 @@ else
         @foreach (var car in cars)
         {
             <tr>
-                <td>@car.Make</td>
+                <td>@car.Brand</td>
                 <td>@car.Model</td>
                 <td>@car.Year</td>
                 <td>@car.DailyRate.ToString("C")</td>

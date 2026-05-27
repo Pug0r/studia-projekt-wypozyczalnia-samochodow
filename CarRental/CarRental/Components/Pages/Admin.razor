@@ -1,0 +1,314 @@
+@page "/admin"
+
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject AdminService AdminSvc
+
+<h1>Admin Panel</h1>
+
+<div class="admin-tabs">
+    <button class="tab-btn @(activeTab == "cars"  ? "active" : "")" @onclick='() => SwitchTab("cars")'>Cars</button>
+    <button class="tab-btn @(activeTab == "users" ? "active" : "")" @onclick='() => SwitchTab("users")'>Users</button>
+</div>
+
+@if (activeTab == "cars")
+{
+    <div class="admin-form-section">
+        <h4>@(editingCarId.HasValue ? "Update Car" : "Add Car")</h4>
+        <EditForm Model="newCar" OnValidSubmit="SubmitCarFormAsync">
+            <div class="form-grid">
+                <label class="field-label">Brand</label>
+                <InputText class="form-control" @bind-Value="newCar.Brand" />
+
+                <label class="field-label">Model</label>
+                <InputText class="form-control" @bind-Value="newCar.Model" />
+
+                <label class="field-label">Year</label>
+                <InputNumber class="form-control" @bind-Value="newCar.Year" />
+
+                <label class="field-label">Daily Rate</label>
+                <InputNumber class="form-control" @bind-Value="newCar.DailyRate" />
+
+                <label class="field-label">Mileage (km)</label>
+                <InputNumber class="form-control" @bind-Value="newCar.Mileage" />
+
+                <label class="field-label">Faults</label>
+                <InputText class="form-control" @bind-Value="newCar.Faults" placeholder="Leave empty if none" />
+            </div>
+            <div class="admin-btn-row">
+                <button type="submit" class="btn admin-btn">
+                    @(editingCarId.HasValue ? "Update Car" : "Add Car")
+                </button>
+                @if (editingCarId.HasValue)
+                {
+                    <button type="button" class="btn btn-cancel" @onclick="CancelEdit">Cancel</button>
+                }
+            </div>
+        </EditForm>
+    </div>
+
+    @if (carsFeedback.HasValue)
+    {
+        <div class="@carsFeedback.Value.css">
+            @carsFeedback.Value.text
+        </div>
+    }
+
+    <div class="list-card">
+        @if (cars.Count == 0)
+        {
+            <div class="list-empty">No cars yet.</div>
+        }
+        else
+        {
+            <div class="list-header">
+                <span class="col-make">Brand / Model</span>
+                <span class="col-year">Year</span>
+                <span class="col-mileage">Mileage</span>
+                <span class="col-rate">Daily Rate</span>
+                <span class="col-status">Status</span>
+                <span class="col-action"></span>
+            </div>
+            @foreach (var car in cars)
+            {
+                <div class="list-row @(car.Id == editingCarId ? "row-editing" : "")">
+                    <span class="col-make">
+                        <span class="car-title"><strong>@car.Brand</strong> @car.Model</span>
+                        @if (!string.IsNullOrWhiteSpace(car.Faults))
+                        {
+                            <span class="car-faults">@car.Faults</span>
+                        }
+                    </span>
+                    <span class="col-year">@car.Year</span>
+                    <span class="col-mileage">@car.Mileage.ToString("N0") km</span>
+                    <span class="col-rate">@car.DailyRate.ToString("C")</span>
+                    <span class="col-status">
+                        <span class="status-pill @(car.IsAvailable ? "pill-available" : "pill-rented")">
+                            @(car.IsAvailable ? "Available" : "Rented")
+                        </span>
+                    </span>
+                    <span class="col-action">
+                        <button class="btn-edit" @onclick="() => StartEdit(car)">Edit</button>
+                        <button class="btn-delete" @onclick="() => DeleteCarAsync(car.Id)">Delete</button>
+                    </span>
+                </div>
+            }
+        }
+    </div>
+}
+else
+{
+    <div class="admin-form-section">
+        <h4>Add User</h4>
+        <EditForm Model="newUser" OnValidSubmit="AddUserAsync">
+            <div class="form-grid">
+                <label class="field-label">Username</label>
+                <InputText class="form-control" @bind-Value="newUser.Username" />
+
+                <label class="field-label">Password</label>
+                <InputText class="form-control" type="password" @bind-Value="newUser.Password" />
+
+                <label class="field-label">Role</label>
+                <InputSelect class="form-select" @bind-Value="newUser.Role">
+                    <option value="@UserRole.Customer">Customer</option>
+                    <option value="@UserRole.Admin">Admin</option>
+                </InputSelect>
+            </div>
+            <div class="admin-btn-row">
+                <button type="submit" class="btn admin-btn">Add User</button>
+            </div>
+        </EditForm>
+    </div>
+
+    @if (usersFeedback.HasValue)
+    {
+        <div class="@usersFeedback.Value.css">
+            @usersFeedback.Value.text
+        </div>
+    }
+
+    <div class="list-card">
+        @if (users.Count == 0)
+        {
+            <div class="list-empty">No users yet.</div>
+        }
+        else
+        {
+            <div class="list-header">
+                <span class="col-username">Username</span>
+                <span class="col-role">Role</span>
+                <span class="col-action"></span>
+            </div>
+            @foreach (var user in users)
+            {
+                bool isSelf = user.Id == Auth.CurrentUser!.Id;
+                <div class="list-row">
+                    <span class="col-username">
+                        @user.Username
+                        @if (isSelf) { <span class="you-tag">(you)</span> }
+                    </span>
+                    <span class="col-role">
+                        <span class="role-pill @(user.Role == UserRole.Admin ? "pill-admin" : "pill-customer")">
+                            @user.Role
+                        </span>
+                    </span>
+                    <span class="col-action">
+                        <button class="btn-delete"
+                                disabled="@isSelf"
+                                title="@(isSelf ? "Cannot delete your own account" : "Delete user")"
+                                @onclick="() => DeleteUserAsync(user.Id)">Delete</button>
+                    </span>
+                </div>
+            }
+        }
+    </div>
+}
+
+@code {
+    private string activeTab = "cars";
+    private int? editingCarId;
+
+    private List<Car> cars = new();
+    private List<User> users = new();
+
+    private (string css, string text)? carsFeedback;
+    private (string css, string text)? usersFeedback;
+
+    private CarFormModel newCar = new();
+    private UserFormModel newUser = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated || Auth.CurrentUser?.Role != UserRole.Admin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadCarsAsync();
+        await LoadUsersAsync();
+    }
+
+    private void SwitchTab(string tab)
+    {
+        activeTab = tab;
+        carsFeedback = null;
+        usersFeedback = null;
+        CancelEdit();
+    }
+
+    private async Task LoadCarsAsync()
+        => cars = await AdminSvc.GetAllCarsAsync();
+
+    private async Task DeleteCarAsync(int id)
+    {
+        if (editingCarId == id)
+            CancelEdit();
+        string? error = await AdminSvc.DeleteCarAsync(id);
+        carsFeedback = error is null ? ("feedback-success", "Car deleted.") : ("form-error", error);
+        await LoadCarsAsync();
+    }
+
+    private void StartEdit(Car car)
+    {
+        editingCarId = car.Id;
+        newCar = new CarFormModel
+        {
+            Brand = car.Brand,
+            Model = car.Model,
+            Year = car.Year,
+            DailyRate = car.DailyRate,
+            Mileage = car.Mileage,
+            Faults = car.Faults
+        };
+        carsFeedback = null;
+    }
+
+    private void CancelEdit()
+    {
+        editingCarId = null;
+        newCar = new CarFormModel();
+    }
+
+    private async Task SubmitCarFormAsync()
+    {
+        if (editingCarId.HasValue)
+        {
+            string? error = await AdminSvc.UpdateCarAsync(
+                editingCarId.Value, newCar.Brand, newCar.Model, newCar.Year,
+                newCar.DailyRate, newCar.Mileage, newCar.Faults);
+
+            if (error is null)
+            {
+                editingCarId = null;
+                newCar = new CarFormModel();
+                carsFeedback = ("feedback-success", "Car updated successfully.");
+                await LoadCarsAsync();
+            }
+            else
+            {
+                carsFeedback = ("form-error", error);
+            }
+        }
+        else
+        {
+            string? error = await AdminSvc.AddCarAsync(
+                newCar.Brand, newCar.Model, newCar.Year, newCar.DailyRate, isAvailable: true,
+                newCar.Mileage, newCar.Faults);
+
+            if (error is null)
+            {
+                newCar = new CarFormModel();
+                carsFeedback = ("feedback-success", "Car added successfully.");
+                await LoadCarsAsync();
+            }
+            else
+            {
+                carsFeedback = ("form-error", error);
+            }
+        }
+    }
+
+    private async Task LoadUsersAsync()
+        => users = await AdminSvc.GetAllUsersAsync();
+
+    private async Task DeleteUserAsync(int id)
+    {
+        string? error = await AdminSvc.DeleteUserAsync(id, Auth.CurrentUser!.Id);
+        usersFeedback = error is null ? ("feedback-success", "User deleted.") : ("form-error", error);
+        await LoadUsersAsync();
+    }
+
+    private async Task AddUserAsync()
+    {
+        string? error = await AdminSvc.AddUserAsync(newUser.Username, newUser.Password, newUser.Role);
+
+        if (error is null)
+        {
+            newUser = new UserFormModel();
+            usersFeedback = ("feedback-success", "User added successfully.");
+            await LoadUsersAsync();
+        }
+        else
+        {
+            usersFeedback = ("form-error", error);
+        }
+    }
+
+    private sealed class CarFormModel
+    {
+        public string Brand { get; set; } = string.Empty;
+        public string Model { get; set; } = string.Empty;
+        public int Year { get; set; } = DateTime.Now.Year;
+        public decimal DailyRate { get; set; }
+        public int Mileage { get; set; }
+        public string Faults { get; set; } = string.Empty;
+    }
+
+    private sealed class UserFormModel
+    {
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public UserRole Role { get; set; } = UserRole.Customer;
+    }
+}

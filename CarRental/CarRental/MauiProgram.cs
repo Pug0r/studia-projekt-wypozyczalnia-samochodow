@@ -24,6 +24,7 @@ public static class MauiProgram
             options.UseSqlite($"Data Source={dbPath}"));
 
         builder.Services.AddSingleton<AuthService>();
+        builder.Services.AddSingleton<AdminService>();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
