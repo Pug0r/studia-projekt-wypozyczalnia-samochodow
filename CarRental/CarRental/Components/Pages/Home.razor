@@ -6,6 +6,11 @@
 
 <h1>Available cars</h1>
 
+<div class="car-search">
+    <input class="car-search-input" placeholder="Search by any field..."
+           @bind="searchQuery" @bind:event="oninput" />
+</div>
+
 @if (cars is null)
 {
     <p>Loading cars...</p>
@@ -16,6 +21,7 @@ else if (cars.Count == 0)
 }
 else
 {
+    var filteredCars = FilterCars(cars, searchQuery);
     <table class="table car-table">
         <thead>
         <tr>
@@ -28,7 +34,7 @@ else
         </tr>
         </thead>
         <tbody>
-        @foreach (var car in cars)
+        @foreach (var car in filteredCars)
         {
             var imageUrl = ToDataUrl(car.ImageData, car.ImageContentType);
             <tr>
@@ -51,14 +57,46 @@ else
         }
         </tbody>
     </table>
-}
 
+    if (filteredCars.Count == 0)
+    {
+        <p class="car-search-empty">No cars match your search.</p>
+    }
+}
 @code {
     private List<Car>? cars;
+    private string searchQuery = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         cars = await DbContext.Cars.AsNoTracking().ToListAsync();
+    }
+
+    private static List<Car> FilterCars(List<Car> source, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return source;
+
+        string q = query.Trim();
+        return source.Where(car => MatchesQuery(car, q)).ToList();
+    }
+
+    private static bool MatchesQuery(Car car, string query)
+    {
+        return ContainsIgnoreCase(car.Brand, query)
+               || ContainsIgnoreCase(car.Model, query)
+               || car.Year.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
+               || car.DailyRate.ToString("C").Contains(query, StringComparison.OrdinalIgnoreCase)
+               || car.DailyRate.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
+               || ContainsIgnoreCase(car.IsAvailable ? "Available" : "Rented", query);
+    }
+
+    private static bool ContainsIgnoreCase(string? value, string query)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        return value.Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? ToDataUrl(byte[]? data, string? contentType)
