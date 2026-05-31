@@ -36,6 +36,9 @@ public static class MauiProgram
         using (IServiceScope scope = app.Services.CreateScope())
         {
             AppDbContext dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+#if DEBUG
+            dbContext.Database.EnsureDeleted();
+#endif
             dbContext.Database.EnsureCreated();
             DbSeeder.SeedAsync(dbContext, enable: true).GetAwaiter().GetResult();
         }
