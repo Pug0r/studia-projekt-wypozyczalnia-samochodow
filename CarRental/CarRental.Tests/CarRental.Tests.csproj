@@ -16,6 +16,7 @@
     <ItemGroup>
         <Compile Include="..\CarRental\Services\AuthService.cs" />
         <Compile Include="..\CarRental\Services\AdminService.cs" />
+        <Compile Include="..\CarRental\Services\CarListFilter.cs" />
         <Compile Include="..\CarRental\Data\AppDbContext.cs" />
         <Compile Include="..\CarRental\Models\User.cs" />
         <Compile Include="..\CarRental\Models\UserRole.cs" />

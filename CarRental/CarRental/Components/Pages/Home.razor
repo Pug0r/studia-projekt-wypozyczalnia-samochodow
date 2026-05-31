@@ -2,6 +2,7 @@
 
 @using CarRental.Models
 @using Microsoft.EntityFrameworkCore
+@using CarRental.Services
 @inject CarRental.Data.AppDbContext DbContext
 
 <h1>Available cars</h1>
@@ -108,7 +109,7 @@ else if (cars.Count == 0)
 }
 else
 {
-    var filteredCars = ApplyFilters(ApplySearch(cars, searchQuery));
+    var filteredCars = CarListFilter.ApplySearchAndFilters(cars, searchQuery, BuildFilterOptions());
     <table class="table car-table">
         <thead>
         <tr>
@@ -189,35 +190,16 @@ else
         selectedStatuses.Clear();
     }
 
-    private static List<Car> ApplySearch(List<Car> source, string query)
+    private CarFilterOptions BuildFilterOptions()
     {
-        if (string.IsNullOrWhiteSpace(query))
-            return source;
+        var options = new CarFilterOptions { MaxRate = filterMaxRate };
 
-        string q = query.Trim();
-        return source.Where(car => MatchesQuery(car, q)).ToList();
-    }
+        foreach (var brand in selectedBrands) options.SelectedBrands.Add(brand);
+        foreach (var model in selectedModels) options.SelectedModels.Add(model);
+        foreach (var year in selectedYears) options.SelectedYears.Add(year);
+        foreach (var status in selectedStatuses) options.SelectedStatuses.Add(status);
 
-    private List<Car> ApplyFilters(List<Car> source)
-    {
-        IEnumerable<Car> query = source;
-
-        if (selectedBrands.Count > 0)
-            query = query.Where(car => selectedBrands.Contains(car.Brand));
-
-        if (selectedModels.Count > 0)
-            query = query.Where(car => selectedModels.Contains(car.Model));
-
-        if (selectedYears.Count > 0)
-            query = query.Where(car => selectedYears.Contains(car.Year.ToString()));
-
-        if (selectedStatuses.Count > 0)
-            query = query.Where(car => selectedStatuses.Contains(car.IsAvailable ? "Available" : "Rented"));
-
-        if (decimal.TryParse(filterMaxRate, out decimal maxRate))
-            query = query.Where(car => car.DailyRate <= maxRate);
-
-        return query.ToList();
+        return options;
     }
 
     private void ToggleSelection(HashSet<string> selections, string value)
@@ -246,24 +228,6 @@ else
     private void ToggleModels() => showModels = !showModels;
     private void ToggleYears() => showYears = !showYears;
     private void ToggleStatuses() => showStatuses = !showStatuses;
-
-    private static bool MatchesQuery(Car car, string query)
-    {
-        return ContainsIgnoreCase(car.Brand, query)
-               || ContainsIgnoreCase(car.Model, query)
-               || car.Year.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
-               || car.DailyRate.ToString("C").Contains(query, StringComparison.OrdinalIgnoreCase)
-               || car.DailyRate.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
-               || ContainsIgnoreCase(car.IsAvailable ? "Available" : "Rented", query);
-    }
-
-    private static bool ContainsIgnoreCase(string? value, string query)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        return value.Contains(query, StringComparison.OrdinalIgnoreCase);
-    }
 
     private static string? ToDataUrl(byte[]? data, string? contentType)
     {
