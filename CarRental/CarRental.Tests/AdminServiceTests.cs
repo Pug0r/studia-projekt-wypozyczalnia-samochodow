@@ -62,7 +62,7 @@ public sealed class AdminServiceTests : IDisposable
     [Fact]
     public async Task AddCarAsync_ValidCar_ReturnsNullAndCarAppears()
     {
-        string? error = await service.AddCarAsync("Honda", "Civic", 2023, 99.99m, true, 15000, "");
+        string? error = await service.AddCarAsync("Honda", "Civic", 2023, 99.99m, true, 15000, "", null, null, null);
 
         Assert.Null(error);
         List<Car> cars = await service.GetAllCarsAsync();
@@ -70,6 +70,20 @@ public sealed class AdminServiceTests : IDisposable
         Assert.Equal("Honda", cars[0].Brand);
         Assert.Equal("Civic", cars[0].Model);
         Assert.Equal(15000, cars[0].Mileage);
+    }
+
+    [Fact]
+    public async Task AddCarAsync_WithImage_StoresImageData()
+    {
+        byte[] image = { 1, 2, 3, 4 };
+        string? error = await service.AddCarAsync("Mazda", "3", 2021, 89.5m, true, 12000, "",
+            image, "image/png", "mazda.png");
+
+        Assert.Null(error);
+        Car car = Assert.Single(await service.GetAllCarsAsync());
+        Assert.Equal(image, car.ImageData);
+        Assert.Equal("image/png", car.ImageContentType);
+        Assert.Equal("mazda.png", car.ImageFileName);
     }
 
     [Theory]
@@ -80,7 +94,7 @@ public sealed class AdminServiceTests : IDisposable
     [InlineData("Toyota", "Corolla", 2022, 100, -1)]
     public async Task AddCarAsync_InvalidInput_ReturnsError(string make, string model, int year, decimal rate, int mileage)
     {
-        string? error = await service.AddCarAsync(make, model, year, rate, true, mileage, "");
+        string? error = await service.AddCarAsync(make, model, year, rate, true, mileage, "", null, null, null);
 
         Assert.NotNull(error);
         Assert.Empty(await service.GetAllCarsAsync());
@@ -91,7 +105,8 @@ public sealed class AdminServiceTests : IDisposable
     {
         int id = await SeedCarAsync("Toyota", "Corolla", 2020, 100m);
 
-        string? error = await service.UpdateCarAsync(id, "Honda", "Civic", 2023, 149.99m, 30000, "Cracked mirror");
+        string? error = await service.UpdateCarAsync(id, "Honda", "Civic", 2023, 149.99m, 30000, "Cracked mirror",
+            new byte[] { 5, 6, 7 }, "image/jpeg", "honda.jpg");
 
         Assert.Null(error);
         List<Car> cars = await service.GetAllCarsAsync();
@@ -102,12 +117,15 @@ public sealed class AdminServiceTests : IDisposable
         Assert.Equal(149.99m, updated.DailyRate);
         Assert.Equal(30000, updated.Mileage);
         Assert.Equal("Cracked mirror", updated.Faults);
+        Assert.Equal("image/jpeg", updated.ImageContentType);
+        Assert.Equal("honda.jpg", updated.ImageFileName);
+        Assert.Equal(new byte[] { 5, 6, 7 }, updated.ImageData);
     }
 
     [Fact]
     public async Task UpdateCarAsync_NonExistentCar_ReturnsError()
     {
-        string? error = await service.UpdateCarAsync(999, "Honda", "Civic", 2023, 100m, 0, "");
+        string? error = await service.UpdateCarAsync(999, "Honda", "Civic", 2023, 100m, 0, "", null, null, null);
 
         Assert.NotNull(error);
     }
@@ -122,7 +140,7 @@ public sealed class AdminServiceTests : IDisposable
     {
         int id = await SeedCarAsync();
 
-        string? error = await service.UpdateCarAsync(id, make, model, year, rate, mileage, "");
+        string? error = await service.UpdateCarAsync(id, make, model, year, rate, mileage, "", null, null, null);
 
         Assert.NotNull(error);
         Car original = Assert.Single(await service.GetAllCarsAsync());

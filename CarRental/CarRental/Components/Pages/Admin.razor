@@ -34,6 +34,20 @@
 
                 <label class="field-label">Faults</label>
                 <InputText class="form-control" @bind-Value="newCar.Faults" placeholder="Leave empty if none" />
+
+                <label class="field-label">Image</label>
+                <div>
+                    <InputFile OnChange="OnImageSelected" accept="image/*" />
+                    <div class="form-hint">Max size 2 MB. Optional.</div>
+                    @if (!string.IsNullOrWhiteSpace(newCar.ImageFileName))
+                    {
+                        <div class="form-hint">Selected: @newCar.ImageFileName</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(imagePreviewDataUrl))
+                    {
+                        <img src="@imagePreviewDataUrl" alt="Car image preview" style="max-width: 220px; max-height: 140px; margin-top: 8px; border-radius: 6px;" />
+                    }
+                </div>
             </div>
             <div class="admin-btn-row">
                 <button type="submit" class="btn admin-btn">
@@ -167,6 +181,7 @@ else
 @code {
     private string activeTab = "cars";
     private int? editingCarId;
+    private const long MaxImageSizeBytes = 2 * 1024 * 1024;
 
     private List<Car> cars = new();
     private List<User> users = new();
@@ -176,6 +191,7 @@ else
 
     private CarFormModel newCar = new();
     private UserFormModel newUser = new();
+    private string? imagePreviewDataUrl;
 
     protected override async Task OnInitializedAsync()
     {
@@ -219,8 +235,12 @@ else
             Year = car.Year,
             DailyRate = car.DailyRate,
             Mileage = car.Mileage,
-            Faults = car.Faults
+            Faults = car.Faults,
+            ImageData = car.ImageData,
+            ImageContentType = car.ImageContentType,
+            ImageFileName = car.ImageFileName
         };
+        imagePreviewDataUrl = ToDataUrl(car.ImageData, car.ImageContentType);
         carsFeedback = null;
     }
 
@@ -228,6 +248,7 @@ else
     {
         editingCarId = null;
         newCar = new CarFormModel();
+        imagePreviewDataUrl = null;
     }
 
     private async Task SubmitCarFormAsync()
@@ -236,12 +257,14 @@ else
         {
             string? error = await AdminSvc.UpdateCarAsync(
                 editingCarId.Value, newCar.Brand, newCar.Model, newCar.Year,
-                newCar.DailyRate, newCar.Mileage, newCar.Faults);
+                newCar.DailyRate, newCar.Mileage, newCar.Faults,
+                newCar.ImageData, newCar.ImageContentType, newCar.ImageFileName);
 
             if (error is null)
             {
                 editingCarId = null;
                 newCar = new CarFormModel();
+                imagePreviewDataUrl = null;
                 carsFeedback = ("feedback-success", "Car updated successfully.");
                 await LoadCarsAsync();
             }
@@ -254,11 +277,13 @@ else
         {
             string? error = await AdminSvc.AddCarAsync(
                 newCar.Brand, newCar.Model, newCar.Year, newCar.DailyRate, isAvailable: true,
-                newCar.Mileage, newCar.Faults);
+                newCar.Mileage, newCar.Faults,
+                newCar.ImageData, newCar.ImageContentType, newCar.ImageFileName);
 
             if (error is null)
             {
                 newCar = new CarFormModel();
+                imagePreviewDataUrl = null;
                 carsFeedback = ("feedback-success", "Car added successfully.");
                 await LoadCarsAsync();
             }
@@ -267,6 +292,37 @@ else
                 carsFeedback = ("form-error", error);
             }
         }
+    }
+
+    private async Task OnImageSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+            return;
+
+        if (file.Size > MaxImageSizeBytes)
+        {
+            carsFeedback = ("form-error", "Image must be 2 MB or smaller.");
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(MaxImageSizeBytes);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+
+        newCar.ImageData = buffer.ToArray();
+        newCar.ImageContentType = file.ContentType;
+        newCar.ImageFileName = file.Name;
+        imagePreviewDataUrl = ToDataUrl(newCar.ImageData, newCar.ImageContentType);
+        carsFeedback = null;
+    }
+
+    private static string? ToDataUrl(byte[]? data, string? contentType)
+    {
+        if (data is null || string.IsNullOrWhiteSpace(contentType))
+            return null;
+
+        return $"data:{contentType};base64,{Convert.ToBase64String(data)}";
     }
 
     private async Task LoadUsersAsync()
@@ -303,6 +359,9 @@ else
         public decimal DailyRate { get; set; }
         public int Mileage { get; set; }
         public string Faults { get; set; } = string.Empty;
+        public byte[]? ImageData { get; set; }
+        public string? ImageContentType { get; set; }
+        public string? ImageFileName { get; set; }
     }
 
     private sealed class UserFormModel

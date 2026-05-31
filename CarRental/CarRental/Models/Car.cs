@@ -10,5 +10,7 @@ public sealed class Car
     public bool IsAvailable { get; set; } = true;
     public int Mileage { get; set; }
     public string Faults { get; set; } = string.Empty;
+    public byte[]? ImageData { get; set; }
+    public string? ImageContentType { get; set; }
+    public string? ImageFileName { get; set; }
 }
-

@@ -19,7 +19,8 @@ public sealed class AdminService
         return await db.Cars.AsNoTracking().OrderBy(c => c.Id).ToListAsync();
     }
 
-    public async Task<string?> AddCarAsync(string brand, string model, int year, decimal dailyRate, bool isAvailable, int mileage, string faults)
+    public async Task<string?> AddCarAsync(string brand, string model, int year, decimal dailyRate, bool isAvailable,
+        int mileage, string faults, byte[]? imageData, string? imageContentType, string? imageFileName)
     {
         if (string.IsNullOrWhiteSpace(brand) || string.IsNullOrWhiteSpace(model))
             return "Brand and Model are required.";
@@ -39,13 +40,17 @@ public sealed class AdminService
             DailyRate = dailyRate,
             IsAvailable = isAvailable,
             Mileage = mileage,
-            Faults = faults.Trim()
+            Faults = faults.Trim(),
+            ImageData = imageData,
+            ImageContentType = imageContentType,
+            ImageFileName = imageFileName
         });
         await db.SaveChangesAsync();
         return null;
     }
 
-    public async Task<string?> UpdateCarAsync(int carId, string brand, string model, int year, decimal dailyRate, int mileage, string faults)
+    public async Task<string?> UpdateCarAsync(int carId, string brand, string model, int year, decimal dailyRate,
+        int mileage, string faults, byte[]? imageData, string? imageContentType, string? imageFileName)
     {
         if (string.IsNullOrWhiteSpace(brand) || string.IsNullOrWhiteSpace(model))
             return "Brand and Model are required.";
@@ -66,6 +71,13 @@ public sealed class AdminService
         car.DailyRate = dailyRate;
         car.Mileage = mileage;
         car.Faults = faults.Trim();
+
+        if (imageData is not null)
+        {
+            car.ImageData = imageData;
+            car.ImageContentType = imageContentType;
+            car.ImageFileName = imageFileName;
+        }
 
         await db.SaveChangesAsync();
         return null;

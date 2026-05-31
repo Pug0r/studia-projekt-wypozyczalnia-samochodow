@@ -3,12 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CarRental.Data;
 
-public sealed class AppDbContext : DbContext
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
-    {
-    }
-
     public DbSet<Car> Cars => Set<Car>();
     public DbSet<User> Users => Set<User>();
 
@@ -20,6 +16,8 @@ public sealed class AppDbContext : DbContext
             entity.Property(e => e.Model).HasMaxLength(100);
             entity.Property(e => e.DailyRate).HasPrecision(10, 2);
             entity.Property(e => e.Faults).HasMaxLength(200);
+            entity.Property(e => e.ImageContentType).HasMaxLength(100);
+            entity.Property(e => e.ImageFileName).HasMaxLength(200);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -30,4 +28,3 @@ public sealed class AppDbContext : DbContext
         });
     }
 }
-
