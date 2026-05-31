@@ -11,6 +11,93 @@
            @bind="searchQuery" @bind:event="oninput" />
 </div>
 
+<div class="car-filters">
+    <div class="filter-group">
+        <div class="filter-header">
+            <div class="filter-title">Brand</div>
+            <button type="button" class="filter-toggle" @onclick="ToggleBrands">
+                @(showBrands ? "Hide" : "Show")
+            </button>
+        </div>
+        @if (showBrands)
+        {
+            @foreach (var brand in availableBrands)
+            {
+                <label class="filter-option">
+                    <input type="checkbox" checked="@selectedBrands.Contains(brand)" @onchange="() => ToggleSelection(selectedBrands, brand)" />
+                    <span>@brand</span>
+                </label>
+            }
+        }
+    </div>
+
+    <div class="filter-group">
+        <div class="filter-header">
+            <div class="filter-title">Model</div>
+            <button type="button" class="filter-toggle" @onclick="ToggleModels">
+                @(showModels ? "Hide" : "Show")
+            </button>
+        </div>
+        @if (showModels)
+        {
+            @foreach (var model in availableModels)
+            {
+                <label class="filter-option">
+                    <input type="checkbox" checked="@selectedModels.Contains(model)" @onchange="() => ToggleSelection(selectedModels, model)" />
+                    <span>@model</span>
+                </label>
+            }
+        }
+    </div>
+
+    <div class="filter-group">
+        <div class="filter-header">
+            <div class="filter-title">Year</div>
+            <button type="button" class="filter-toggle" @onclick="ToggleYears">
+                @(showYears ? "Hide" : "Show")
+            </button>
+        </div>
+        @if (showYears)
+        {
+            @foreach (var year in availableYears)
+            {
+                <label class="filter-option">
+                    <input type="checkbox" checked="@selectedYears.Contains(year)" @onchange="() => ToggleSelection(selectedYears, year)" />
+                    <span>@year</span>
+                </label>
+            }
+        }
+    </div>
+
+    <div class="filter-group">
+        <div class="filter-header">
+            <div class="filter-title">Status</div>
+            <button type="button" class="filter-toggle" @onclick="ToggleStatuses">
+                @(showStatuses ? "Hide" : "Show")
+            </button>
+        </div>
+        @if (showStatuses)
+        {
+            @foreach (var status in availableStatuses)
+            {
+                <label class="filter-option">
+                    <input type="checkbox" checked="@selectedStatuses.Contains(status)" @onchange="() => ToggleSelection(selectedStatuses, status)" />
+                    <span>@status</span>
+                </label>
+            }
+        }
+    </div>
+
+    <div class="filter-group">
+        <div class="filter-header">
+            <div class="filter-title">Max daily rate</div>
+        </div>
+        <input class="filter-input" placeholder="Max daily rate" @bind="filterMaxRate" @bind:event="oninput" />
+    </div>
+
+    <button class="filter-clear" @onclick="ClearFilters">Clear</button>
+</div>
+
 @if (cars is null)
 {
     <p>Loading cars...</p>
@@ -21,7 +108,7 @@ else if (cars.Count == 0)
 }
 else
 {
-    var filteredCars = FilterCars(cars, searchQuery);
+    var filteredCars = ApplyFilters(ApplySearch(cars, searchQuery));
     <table class="table car-table">
         <thead>
         <tr>
@@ -60,19 +147,49 @@ else
 
     if (filteredCars.Count == 0)
     {
-        <p class="car-search-empty">No cars match your search.</p>
+        <p class="car-search-empty">No cars match your search or filters.</p>
     }
 }
 @code {
     private List<Car>? cars;
     private string searchQuery = string.Empty;
+    private string filterMaxRate = string.Empty;
+
+    private readonly HashSet<string> selectedBrands = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> selectedModels = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> selectedYears = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> selectedStatuses = new(StringComparer.OrdinalIgnoreCase);
+
+    private List<string> availableBrands = new();
+    private List<string> availableModels = new();
+    private List<string> availableYears = new();
+    private List<string> availableStatuses = new();
+
+    private bool showBrands;
+    private bool showModels;
+    private bool showYears;
+    private bool showStatuses;
 
     protected override async Task OnInitializedAsync()
     {
         cars = await DbContext.Cars.AsNoTracking().ToListAsync();
+        InitializeFilterOptions(cars);
     }
 
-    private static List<Car> FilterCars(List<Car> source, string query)
+    private void InitializeFilterOptions(List<Car> source)
+    {
+        availableBrands = source.Select(car => car.Brand).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s).ToList();
+        availableModels = source.Select(car => car.Model).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s).ToList();
+        availableYears = source.Select(car => car.Year.ToString()).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s).ToList();
+        availableStatuses = new List<string> { "Available", "Rented" };
+
+        selectedBrands.Clear();
+        selectedModels.Clear();
+        selectedYears.Clear();
+        selectedStatuses.Clear();
+    }
+
+    private static List<Car> ApplySearch(List<Car> source, string query)
     {
         if (string.IsNullOrWhiteSpace(query))
             return source;
@@ -80,6 +197,55 @@ else
         string q = query.Trim();
         return source.Where(car => MatchesQuery(car, q)).ToList();
     }
+
+    private List<Car> ApplyFilters(List<Car> source)
+    {
+        IEnumerable<Car> query = source;
+
+        if (selectedBrands.Count > 0)
+            query = query.Where(car => selectedBrands.Contains(car.Brand));
+
+        if (selectedModels.Count > 0)
+            query = query.Where(car => selectedModels.Contains(car.Model));
+
+        if (selectedYears.Count > 0)
+            query = query.Where(car => selectedYears.Contains(car.Year.ToString()));
+
+        if (selectedStatuses.Count > 0)
+            query = query.Where(car => selectedStatuses.Contains(car.IsAvailable ? "Available" : "Rented"));
+
+        if (decimal.TryParse(filterMaxRate, out decimal maxRate))
+            query = query.Where(car => car.DailyRate <= maxRate);
+
+        return query.ToList();
+    }
+
+    private void ToggleSelection(HashSet<string> selections, string value)
+    {
+        if (!selections.Add(value))
+            selections.Remove(value);
+    }
+
+    private void ClearFilters()
+    {
+        searchQuery = string.Empty;
+        filterMaxRate = string.Empty;
+
+        selectedBrands.Clear();
+        selectedModels.Clear();
+        selectedYears.Clear();
+        selectedStatuses.Clear();
+        
+        showBrands = false;
+        showModels = false;
+        showYears = false;
+        showStatuses = false;
+    }
+
+    private void ToggleBrands() => showBrands = !showBrands;
+    private void ToggleModels() => showModels = !showModels;
+    private void ToggleYears() => showYears = !showYears;
+    private void ToggleStatuses() => showStatuses = !showStatuses;
 
     private static bool MatchesQuery(Car car, string query)
     {
