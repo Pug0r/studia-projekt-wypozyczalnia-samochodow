@@ -9,6 +9,7 @@
 5. [Instrukcja obsługi](#5-instrukcja-obsługi)
    - 5.1 [Logowanie i rejestracja](#51-logowanie-i-rejestracja)
    - 5.2 [Panel administratora](#52-panel-administratora)
+   - 5.3 [Wyszukiwanie i filtrowanie](#53-wyszukiwanie-i-filtrowanie)
 
 ---
 
@@ -19,7 +20,7 @@ Celem projektu jest demonstracja działającego systemu wypożyczalni samochodó
 ### Główne funkcje
 
 - **Logowanie i rejestracja** — każdy nowy użytkownik może założyć konto i się zalogować.
-- **Przeglądanie floty** — zalogowany użytkownik widzi listę wszystkich samochodów z ich statusem dostępności i cennikiem.
+- **Przeglądanie floty** — zalogowany użytkownik widzi listę wszystkich samochodów z ich statusem dostępności i cennikiem. Użytkownik może wyszukiwać i filtrować dostępne samochody.
 - **Panel administratora** — administrator może dodawać, edytować i usuwać samochody oraz zarządzać kontami użytkowników.
 
 ### Użyte technologie
@@ -125,6 +126,9 @@ Aplikacja przechowuje dane w lokalnej bazie SQLite. Schemat tworzony jest automa
 | `IsAvailable` | `INTEGER` (bool) | `true` = dostępny, `false` = wynajęty |
 | `Mileage` | `INTEGER` | Przebieg w kilometrach |
 | `Faults` | `TEXT` (max 200) | Opis usterek/uszkodzeń (puste = brak usterek) |
+| `ImageData` | `BLOB` | Dane obrazu (opcjonalnie) |
+| `ImageContentType` | `TEXT` (max 100) | Typ MIME obrazu, np. `image/jpeg` |
+| `ImageFileName` | `TEXT` (max 200) | Oryginalna nazwa pliku obrazu |
 
 **Uwaga:** pole `IsAvailable` nie jest eksponowane w formularzu edycji — nowe samochody dodawane są zawsze jako dostępne.
 
@@ -162,3 +166,16 @@ Panel zawiera dwie zakładki: **Cars** i **Users**.
 **Zakładka Users:**
 - **Dodawanie** — podaj Username, Password i wybierz rolę (`Customer` lub `Admin`), kliknij **Add User**.
 - **Usuwanie** — kliknij **Delete** przy wybranym koncie. Nie można usunąć własnego konta (przycisk jest nieaktywny).
+
+---
+
+### 5.3 Wyszukiwanie i filtrowanie
+
+Na stronie głównej dostępne są:
+
+- **Wyszukiwarka** — pole tekstowe „Search by any field...”. Wpisana fraza filtruje listę po wszystkich widocznych informacjach: Brand, Model, Year, Daily rate i Status.
+- **Filtry** — zestaw check-list dla Brand, Model, Year i Status (domyślnie zwinięte). Kliknij **Show** przy wybranym filtrze, aby rozwinąć listę i zaznaczyć wartości.
+- **Max daily rate** — pole liczbowo-tekstowe ograniczające maksymalną cenę za dobę.
+- **Clear** — czyści wyszukiwanie, usuwa wszystkie zaznaczenia i zwija listy filtrów.
+
+Wyniki aktualizują się na bieżąco podczas wpisywania i zaznaczania opcji.
