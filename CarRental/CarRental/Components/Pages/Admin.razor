@@ -85,8 +85,13 @@
             </div>
             @foreach (var car in cars)
             {
+                var carImageUrl = ToDataUrl(car.ImageData, car.ImageContentType);
                 <div class="list-row @(car.Id == editingCarId ? "row-editing" : "")">
                     <span class="col-make">
+                        @if (!string.IsNullOrWhiteSpace(carImageUrl))
+                        {
+                            <img src="@carImageUrl" alt="@($"{car.Brand} {car.Model}")" style="width: 64px; height: 44px; object-fit: cover; border-radius: 6px; margin-right: 10px; vertical-align: middle;" />
+                        }
                         <span class="car-title"><strong>@car.Brand</strong> @car.Model</span>
                         @if (!string.IsNullOrWhiteSpace(car.Faults))
                         {
