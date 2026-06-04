@@ -11,14 +11,13 @@ public sealed class Rental
     public decimal TotalCost { get; set; }
     public RentalStatus Status { get; set; } = RentalStatus.Active;
 
-    // Nawigacje
     public Car? Car { get; set; }
     public User? User { get; set; }
 }
 
 public enum RentalStatus
 {
-    Active,      // Wypożyczone, jeszcze nie zwrócone
-    Completed,   // Zwrócone
-    Cancelled    // Anulowane
+    Active,     
+    Completed,
+    Cancelled
 }

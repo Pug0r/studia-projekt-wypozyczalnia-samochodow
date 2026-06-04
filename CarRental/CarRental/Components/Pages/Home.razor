@@ -11,17 +11,17 @@
 <h1>Available cars</h1>
 
 <div class="date-filter-panel" style="background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 20px;">
-    <h5 style="margin-top: 0; margin-bottom: 15px; font-weight: bold;">Wybierz termin wypożyczenia:</h5>
+    <h5 style="margin-top: 0; margin-bottom: 15px; font-weight: bold;">Choose rental date:</h5>
     <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
         <div style="flex: 1; min-width: 200px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Data od:</label>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Date from:</label>
             <input type="date" class="form-control" 
                    @bind="searchStartDate" 
                    @bind:event="onchange" 
                    min="@DateTime.Today.ToString("yyyy-MM-dd")" style="width: 100%; padding: 6px 12px;" />
         </div>
         <div style="flex: 1; min-width: 200px;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Data do:</label>
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Date to:</label>
             <input type="date" class="form-control" 
                    @bind="searchEndDate" 
                    @bind:event="onchange" 
@@ -200,7 +200,6 @@ else
     private string filterMaxRate = string.Empty;
     private Car? selectedCar;
 
-    // Pola dat zainicjalizowane domyślnie na okres od dzisiaj do jutra
     private DateTime searchStartDate = DateTime.Today;
     private DateTime searchEndDate = DateTime.Today.AddDays(1);
 
@@ -231,11 +230,9 @@ else
             searchEndDate = searchStartDate;
         }
 
-        // Ustawiamy sztywne granice dnia: od 00:00:00 pierwszego dnia do 23:59:59 ostatniego dnia
         DateTime startTarget = searchStartDate.Date;
         DateTime endTarget = searchEndDate.Date.AddDays(1).AddTicks(-1);
 
-        // Pobranie zajętych ID aut z bazy - usunęliśmy wywołania .Date wewnątrz Where
         var rentedCarIds = await DbContext.Rentals
             .Where(r => r.Status == RentalStatus.Active &&
                         r.StartDate <= endTarget &&
@@ -245,7 +242,6 @@ else
 
         var allCars = await DbContext.Cars.AsNoTracking().ToListAsync();
 
-        // Dynamiczne przypisanie statusu IsAvailable
         foreach (var car in allCars)
         {
             car.IsAvailable = !rentedCarIds.Contains(car.Id);
@@ -273,7 +269,6 @@ else
         selectedYears.Clear();
         selectedStatuses.Clear();
 
-        // Domyślnie filtrujemy widok tak, aby pokazywał wyłącznie samochody faktycznie dostępne w wybranej dacie
         selectedStatuses.Add("Available");
     }
 
@@ -328,11 +323,9 @@ else
 
     private void NavigateToCheckout(int carId)
     {
-        // Formatujemy daty do bezpiecznego formatu tekstowego YYYY-MM-DD
         string fromStr = searchStartDate.ToString("yyyy-MM-dd");
         string toStr = searchEndDate.ToString("yyyy-MM-dd");
 
-        // Przekierowujemy na nową stronę, przekazując ID i wybrane wcześniej w filtrach daty
         NavigationManager.NavigateTo($"/rent/{carId}?FromDate={fromStr}&ToDate={toStr}");
     }
 }

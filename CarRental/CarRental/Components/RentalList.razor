@@ -6,13 +6,13 @@
 
 @if (rentals == null)
 {
-    <p>Ładowanie...</p>
+    <p>Loading...</p>
 }
 else if (!rentals.Any())
 {
     <div>
-        <p>Nie masz żadnych wypożyczeń.</p>
-        <p>Przejdź do listy samochodów, aby coś wypożyczyć.</p>
+        <p>You don't have any rentals.</p>
+        <p>Go to the car list to rent something.</p>
     </div>
 }
 else
@@ -42,15 +42,15 @@ else
                 Status:
                 @if (rental.Status == RentalStatus.Active)
                 {
-                    <text>Aktywne</text>
+                    <text>Active</text>
                 }
                 else if (rental.Status == RentalStatus.Completed)
                 {
-                    <text>Zakończone</text>
+                    <text>Completed</text>
                 }
                 else if (rental.Status == RentalStatus.Cancelled)
                 {
-                    <text>Anulowane</text>
+                    <text>Cancelled</text>
                 }
             </p>
 

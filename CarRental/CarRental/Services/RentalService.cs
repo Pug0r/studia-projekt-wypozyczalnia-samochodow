@@ -15,7 +15,6 @@ public sealed class RentalService
         _authService = authService;
     }
 
-    // Pobierz wszystkie wypożyczenia bieżącego użytkownika
     public async Task<List<Rental>> GetMyRentalsAsync()
     {
         if (_authService.CurrentUser == null)
@@ -29,7 +28,6 @@ public sealed class RentalService
             .ToListAsync();
     }
 
-    // Pobierz wszystkie wypożyczenia (dla admina)
     public async Task<List<Rental>> GetAllRentalsAsync()
     {
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
@@ -40,7 +38,6 @@ public sealed class RentalService
             .ToListAsync();
     }
 
-    // Pobierz aktywne wypożyczenia (admin)
     public async Task<List<Rental>> GetActiveRentalsAsync()
     {
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
@@ -52,33 +49,29 @@ public sealed class RentalService
             .ToListAsync();
     }
 
-    // Wypożycz samochód
     public async Task<string?> RentCarAsync(int carId, DateTime startDate, DateTime endDate)
     {
-        // Walidacja
         if (_authService.CurrentUser == null)
-            return "Musisz być zalogowany.";
+            return "You must be logged in.";
 
         if (startDate.Date < DateTime.Today)
-            return "Data rozpoczęcia nie może być w przeszłości.";
+            return "Start date cannot be in the past.";
 
         if (endDate.Date <= startDate.Date)
-            return "Data zakończenia musi być późniejsza niż data rozpoczęcia.";
+            return "End date must be later than start date.";
 
         if ((endDate.Date - startDate.Date).Days > 30)
-            return "Maksymalny okres wypożyczenia to 30 dni.";
+            return "Maximum rental period is 30 days.";
 
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
 
-        // Sprawdź czy samochód istnieje i jest dostępny
         Car? car = await db.Cars.FindAsync(carId);
         if (car == null)
-            return "Samochód nie istnieje.";
+            return "Car does not exist.";
 
         if (!car.IsAvailable)
-            return "Samochód jest już wypożyczony.";
+            return "Car is already rented.";
 
-        // Sprawdź czy nie ma konfliktów terminów
         bool hasConflict = await db.Rentals.AnyAsync(r =>
             r.CarId == carId &&
             r.Status == RentalStatus.Active &&
@@ -86,13 +79,12 @@ public sealed class RentalService
             r.EndDate.Date >= startDate.Date);
 
         if (hasConflict)
-            return "Samochód jest już zarezerwowany w tym terminie.";
+            return "Car is already booked for this period.";
 
-        // Oblicz koszt
+
         int days = (endDate.Date - startDate.Date).Days;
         decimal totalCost = days * car.DailyRate;
 
-        // Utwórz wypożyczenie
         Rental rental = new Rental
         {
             CarId = carId,
@@ -103,16 +95,15 @@ public sealed class RentalService
             Status = RentalStatus.Active
         };
 
-        // Zaktualizuj dostępność samochodu
+
         car.IsAvailable = false;
 
         db.Rentals.Add(rental);
         await db.SaveChangesAsync();
 
-        return null; // Sukces
+        return null; 
     }
 
-    // Zwróć samochód
     public async Task<string?> ReturnCarAsync(int rentalId)
     {
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
@@ -122,20 +113,18 @@ public sealed class RentalService
             .FirstOrDefaultAsync(r => r.Id == rentalId);
 
         if (rental == null)
-            return "Wypożyczenie nie istnieje.";
+            return "Rental does not exist.";
 
         if (rental.Status != RentalStatus.Active)
-            return "To wypożyczenie zostało już zakończone.";
+            return "This rental has already been completed.";
 
-        // Sprawdź uprawnienia (admin lub właściciel)
         if (_authService.CurrentUser?.Role != UserRole.Admin &&
             rental.UserId != _authService.CurrentUser?.Id)
-            return "Nie masz uprawnień do zwrotu tego samochodu.";
+            return "You do not have permission to return this car.";
 
         rental.ReturnDate = DateTime.Now;
         rental.Status = RentalStatus.Completed;
 
-        // Przywróć dostępność samochodu
         if (rental.Car != null)
             rental.Car.IsAvailable = true;
 
@@ -143,7 +132,6 @@ public sealed class RentalService
         return null;
     }
 
-    // Anuluj wypożyczenie (tylko dla admina lub przed rozpoczęciem)
     public async Task<string?> CancelRentalAsync(int rentalId)
     {
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
@@ -153,25 +141,22 @@ public sealed class RentalService
             .FirstOrDefaultAsync(r => r.Id == rentalId);
 
         if (rental == null)
-            return "Wypożyczenie nie istnieje.";
+            return "Rental does not exist.";
 
         if (rental.Status != RentalStatus.Active)
-            return "To wypożyczenie nie może być anulowane.";
+            return "This rental cannot be canceled.";
 
-        // Sprawdź uprawnienia
         bool isAdmin = _authService.CurrentUser?.Role == UserRole.Admin;
         bool isOwner = rental.UserId == _authService.CurrentUser?.Id;
 
         if (!isAdmin && !isOwner)
-            return "Nie masz uprawnień do anulowania tego wypożyczenia.";
+            return "You do not have permission to cancel this rental.";
 
-        // Jeśli anuluje klient, może to zrobić tylko przed rozpoczęciem
         if (!isAdmin && rental.StartDate.Date <= DateTime.Today)
-            return "Nie możesz anulować wypożyczenia, które już się rozpoczęło.";
+            return "You cannot cancel a rental that has already started.";
 
         rental.Status = RentalStatus.Cancelled;
 
-        // Przywróć dostępność samochodu
         if (rental.Car != null)
             rental.Car.IsAvailable = true;
 
@@ -179,11 +164,10 @@ public sealed class RentalService
         return null;
     }
 
-    // Przedłuż wypożyczenie (admin)
     public async Task<string?> ExtendRentalAsync(int rentalId, DateTime newEndDate)
     {
         if (_authService.CurrentUser?.Role != UserRole.Admin)
-            return "Tylko administrator może przedłużać wypożyczenia.";
+            return "Only administrators can extend rentals.";
 
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
 
@@ -192,18 +176,17 @@ public sealed class RentalService
             .FirstOrDefaultAsync(r => r.Id == rentalId);
 
         if (rental == null)
-            return "Wypożyczenie nie istnieje.";
+            return "Rental does not exist.";
 
         if (rental.Status != RentalStatus.Active)
-            return "To wypożyczenie nie jest aktywne.";
+            return "This rental is not active.";
 
         if (newEndDate.Date <= rental.EndDate.Date)
-            return "Nowa data zakończenia musi być późniejsza.";
+            return "New end date must be later.";
 
         if ((newEndDate.Date - rental.StartDate.Date).Days > 45)
-            return "Maksymalny łączny okres wypożyczenia to 45 dni.";
+            return "Maximum rental period is 45 days.";
 
-        // Sprawdź konflikty
         bool hasConflict = await db.Rentals.AnyAsync(r =>
             r.CarId == rental.CarId &&
             r.Id != rentalId &&
@@ -212,9 +195,8 @@ public sealed class RentalService
             r.EndDate.Date >= rental.EndDate.Date);
 
         if (hasConflict)
-            return "Nowy termin koliduje z innym wypożyczeniem.";
+            return "New end date conflicts with another rental.";
 
-        // Oblicz dodatkowy koszt
         int additionalDays = (newEndDate.Date - rental.EndDate.Date).Days;
         if (rental.Car != null)
         {
