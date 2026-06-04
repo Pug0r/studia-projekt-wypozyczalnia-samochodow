@@ -1,0 +1,149 @@
+@page "/rent/{CarId:int}"
+@using CarRental.Models
+@using CarRental.Services
+@using Microsoft.EntityFrameworkCore
+@inject CarRental.Data.AppDbContext DbContext
+@inject RentalService RentalService
+@inject NavigationManager NavigationManager
+
+<div class="container mt-4">
+    <h2>Potwierdzenie wypożyczenia</h2>
+    <hr />
+
+    @if (car == null)
+    {
+        <div class="alert alert-info">Wczytywanie szczegółów pojazdu...</div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body text-center">
+                        @if (car.ImageData != null && !string.IsNullOrWhiteSpace(car.ImageContentType))
+                        {
+                            <img src="data:@car.ImageContentType;base64,@Convert.ToBase64String(car.ImageData)" 
+                                 alt="@car.Brand" class="img-fluid rounded mb-3" style="max-height: 250px; object-fit: cover;" />
+                        }
+                        else
+                        {
+                            <div class="bg-light text-muted d-flex align-items-center justify-content-center rounded mb-3" style="height: 200px;">
+                                Brak zdjęcia pojazdu
+                            </div>
+                        }
+                        <h3 class="card-title font-weight-bold">@car.Brand @car.Model</h3>
+                        <p class="text-muted">Rok produkcji: @car.Year | Przebieg: @car.Mileage km</p>
+                        <ul class="list-group list-group-flush text-start">
+                            <li class="list-group-item"><strong>Cena za dobę:</strong> @car.DailyRate.ToString("C")</li>
+                            <li class="list-group-item"><strong>Usterki/Uwagi:</strong> @(string.IsNullOrWhiteSpace(car.Faults) ? "Brak" : car.Faults)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Ustal szczegóły rezerwacji</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (errorMessage != null)
+                        {
+                            <div class="alert alert-danger">@errorMessage</div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold">Data rozpoczęcia</label>
+                            <input type="date" class="form-control" @bind="startDate" 
+                                   min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label font-weight-bold">Data zakończenia</label>
+                            <input type="date" class="form-control" @bind="endDate" 
+                                   min="@startDate.AddDays(1).ToString("yyyy-MM-dd")" />
+                        </div>
+
+                        <div class="alert alert-warning mt-4">
+                            <h5><strong>Podsumowanie kosztów:</strong></h5>
+                            <div class="d-flex justify-content-between">
+                                <span>Liczba dni:</span>
+                                <strong>@totalDays</strong>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Stawka dzienna:</span>
+                                <strong>@car.DailyRate.ToString("C")</strong>
+                            </div>
+                            <hr />
+                            <div class="d-flex justify-content-between h5 text-danger">
+                                <span>Całkowity koszt:</span>
+                                <strong>@totalCost.ToString("C")</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between bg-transparent">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="GoBack">Anuluj</button>
+                        <button type="button" class="btn btn-success" @onclick="RentCar" disabled="@(totalDays <= 0)">
+                            Potwierdź wypożyczenie
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int CarId { get; set; }
+
+    // Przechwytywanie dat przesłanych w adresie URL z panelu głównego
+    [SupplyParameterFromQuery] public string? FromDate { get; set; }
+    [SupplyParameterFromQuery] public string? ToDate { get; set; }
+
+    private Car? car;
+    private DateTime startDate = DateTime.Today;
+    private DateTime endDate = DateTime.Today.AddDays(1);
+    private string? errorMessage;
+
+    private int totalDays => Math.Max(0, (endDate.Date - startDate.Date).Days);
+    private decimal totalCost => (car?.DailyRate ?? 0) * totalDays;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Pobieramy auto z bazy na podstawie ID z adresu URL
+        car = await DbContext.Cars.FirstOrDefaultAsync(c => c.Id == CarId);
+
+        // Jeśli w URL przekazano już wybrane wcześniej daty, parsujemy je
+        if (DateTime.TryParse(FromDate, out var parsedStart))
+        {
+            startDate = parsedStart;
+        }
+        if (DateTime.TryParse(ToDate, out var parsedEnd))
+        {
+            endDate = parsedEnd;
+        }
+    }
+
+    private async Task RentCar()
+    {
+        errorMessage = null;
+        if (car == null) return;
+
+        var result = await RentalService.RentCarAsync(car.Id, startDate, endDate);
+        
+        if (result == null)
+        {
+            // Pomyślne wypożyczenie przekierowuje do Moich Wypożyczeń
+            NavigationManager.NavigateTo("/myrentals");
+        }
+        else
+        {
+            errorMessage = result;
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+}

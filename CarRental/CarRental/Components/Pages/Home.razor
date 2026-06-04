@@ -1,12 +1,37 @@
 ﻿@page "/"
-
 @using CarRental.Models
 @using Microsoft.EntityFrameworkCore
 @using CarRental.Services
+@using CarRental.Components
 @inject CarRental.Data.AppDbContext DbContext
+@inject RentalService RentalService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
 
 <h1>Available cars</h1>
 
+<div class="date-filter-panel" style="background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 20px;">
+    <h5 style="margin-top: 0; margin-bottom: 15px; font-weight: bold;">Wybierz termin wypożyczenia:</h5>
+    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Data od:</label>
+            <input type="date" class="form-control" 
+                   @bind="searchStartDate" 
+                   @bind:event="onchange" 
+                   min="@DateTime.Today.ToString("yyyy-MM-dd")" style="width: 100%; padding: 6px 12px;" />
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Data do:</label>
+            <input type="date" class="form-control" 
+                   @bind="searchEndDate" 
+                   @bind:event="onchange" 
+                   min="@searchStartDate.ToString("yyyy-MM-dd")" style="width: 100%; padding: 6px 12px;" />
+        </div>
+        <div>
+            <button type="button" class="btn btn-primary" @onclick="LoadCarsByDatesAsync" style="padding: 7px 20px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px;">Szukaj pojazdów</button>
+        </div>
+    </div>
+</div>
 <div class="car-search">
     <input class="car-search-input" placeholder="Search by any field..."
            @bind="searchQuery" @bind:event="oninput" />
@@ -119,6 +144,7 @@ else
             <th>Year</th>
             <th>Daily rate</th>
             <th>Status</th>
+            <th>Actions</th>
         </tr>
         </thead>
         <tbody>
@@ -141,6 +167,21 @@ else
                 <td>@car.Year</td>
                 <td>@car.DailyRate.ToString("C")</td>
                 <td>@(car.IsAvailable ? "Available" : "Rented")</td>
+                <td>
+                    @if (car.IsAvailable && AuthService.CurrentUser?.Role == UserRole.Customer)
+                    {
+                        <button class="btn btn-primary btn-sm" 
+                            @onclick="() => NavigateToCheckout(car.Id)">
+                            Rent
+                        </button>
+                    }
+                    else if (car.IsAvailable && AuthService.CurrentUser is null)
+                    {
+                        <button class="btn btn-secondary btn-sm" disabled>
+                            Login to rent
+                        </button>
+                    }
+                </td>
             </tr>
         }
         </tbody>
@@ -151,10 +192,17 @@ else
         <p class="car-search-empty">No cars match your search or filters.</p>
     }
 }
+
+
 @code {
     private List<Car>? cars;
     private string searchQuery = string.Empty;
     private string filterMaxRate = string.Empty;
+    private Car? selectedCar;
+
+    // Pola dat zainicjalizowane domyślnie na okres od dzisiaj do jutra
+    private DateTime searchStartDate = DateTime.Today;
+    private DateTime searchEndDate = DateTime.Today.AddDays(1);
 
     private readonly HashSet<string> selectedBrands = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> selectedModels = new(StringComparer.OrdinalIgnoreCase);
@@ -173,8 +221,44 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        cars = await DbContext.Cars.AsNoTracking().ToListAsync();
+        await LoadCarsByDatesAsync();
+    }
+
+    private async Task LoadCarsByDatesAsync()
+    {
+        if (searchEndDate < searchStartDate)
+        {
+            searchEndDate = searchStartDate;
+        }
+
+        // Ustawiamy sztywne granice dnia: od 00:00:00 pierwszego dnia do 23:59:59 ostatniego dnia
+        DateTime startTarget = searchStartDate.Date;
+        DateTime endTarget = searchEndDate.Date.AddDays(1).AddTicks(-1);
+
+        // Pobranie zajętych ID aut z bazy - usunęliśmy wywołania .Date wewnątrz Where
+        var rentedCarIds = await DbContext.Rentals
+            .Where(r => r.Status == RentalStatus.Active &&
+                        r.StartDate <= endTarget &&
+                        r.EndDate >= startTarget)
+            .Select(r => r.CarId)
+            .ToListAsync();
+
+        var allCars = await DbContext.Cars.AsNoTracking().ToListAsync();
+
+        // Dynamiczne przypisanie statusu IsAvailable
+        foreach (var car in allCars)
+        {
+            car.IsAvailable = !rentedCarIds.Contains(car.Id);
+        }
+
+        cars = allCars;
         InitializeFilterOptions(cars);
+    }
+
+    private Task RedirectToMyRentals()
+    {
+        NavigationManager.NavigateTo("/myrentals");
+        return Task.CompletedTask;
     }
 
     private void InitializeFilterOptions(List<Car> source)
@@ -188,6 +272,9 @@ else
         selectedModels.Clear();
         selectedYears.Clear();
         selectedStatuses.Clear();
+
+        // Domyślnie filtrujemy widok tak, aby pokazywał wyłącznie samochody faktycznie dostępne w wybranej dacie
+        selectedStatuses.Add("Available");
     }
 
     private CarFilterOptions BuildFilterOptions()
@@ -222,6 +309,8 @@ else
         showModels = false;
         showYears = false;
         showStatuses = false;
+
+        selectedStatuses.Add("Available");
     }
 
     private void ToggleBrands() => showBrands = !showBrands;
@@ -235,5 +324,15 @@ else
             return null;
 
         return $"data:{contentType};base64,{Convert.ToBase64String(data)}";
+    }
+
+    private void NavigateToCheckout(int carId)
+    {
+        // Formatujemy daty do bezpiecznego formatu tekstowego YYYY-MM-DD
+        string fromStr = searchStartDate.ToString("yyyy-MM-dd");
+        string toStr = searchEndDate.ToString("yyyy-MM-dd");
+
+        // Przekierowujemy na nową stronę, przekazując ID i wybrane wcześniej w filtrach daty
+        NavigationManager.NavigateTo($"/rent/{carId}?FromDate={fromStr}&ToDate={toStr}");
     }
 }

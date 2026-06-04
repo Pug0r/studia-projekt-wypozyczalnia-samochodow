@@ -1,0 +1,102 @@
+@using CarRental.Models
+@using CarRental.Services
+@inject RentalService RentalService
+
+<div class="modal fade" id="rentCarModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            @if (car != null)
+            {
+                <div class="modal-header">
+                    <h5 class="modal-title">Wypożycz @car.Brand @car.Model</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (errorMessage != null)
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Data rozpoczęcia</label>
+                        <input type="date" class="form-control" @bind="startDate" 
+                               min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Data zakończenia</label>
+                        <input type="date" class="form-control" @bind="endDate" 
+                               min="@startDate.AddDays(1).ToString("yyyy-MM-dd")" />
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>Podsumowanie:</strong><br />
+                        Liczba dni: @totalDays<br />
+                        Stawka dzienna: @car.DailyRate.ToString("C")<br />
+                        <strong>Całkowity koszt: @totalCost.ToString("C")</strong>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    @* POPRAWIONO: @onclick zamiast onclick *@
+                    <button type="button" class="btn btn-primary" @onclick="RentCar" disabled="@(totalDays <= 0)">
+                        Potwierdź wypożyczenie
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="modal-body text-center p-4">
+                    <p>Wczytywanie szczegółów pojazdu...</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Car? car { get; set; }
+    [Parameter] public EventCallback OnRented { get; set; }
+    
+    // DODANE PARAMETRY - to one naprawią krytyczny błąd
+    [Parameter] public DateTime StartDate { get; set; }
+    [Parameter] public DateTime EndDate { get; set; }
+
+    private DateTime startDate;
+    private DateTime endDate;
+    private string? errorMessage;
+
+    // Przypisujemy wartości z komponentu nadrzędnego, gdy ulegną one zmianie
+    protected override void OnParametersSet()
+    {
+        startDate = StartDate == default ? DateTime.Today : StartDate;
+        endDate = EndDate == default ? DateTime.Today.AddDays(3) : EndDate;
+    }
+
+    private int totalDays => Math.Max(0, (endDate.Date - startDate.Date).Days);
+    private decimal totalCost => (car?.DailyRate ?? 0) * totalDays;
+
+    private async Task RentCar()
+    {
+        errorMessage = null;
+        
+        if (car == null) return;
+
+        var result = await RentalService.RentCarAsync(car.Id, startDate, endDate);
+        
+        if (result == null)
+        {
+            await OnRented.InvokeAsync();
+            await CloseModal();
+        }
+        else
+        {
+            errorMessage = result;
+        }
+    }
+
+    private async Task CloseModal()
+    {
+        await Task.CompletedTask;
+    }
+}

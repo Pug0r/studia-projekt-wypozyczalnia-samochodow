@@ -1,0 +1,1107 @@
+﻿
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Data\AppDbContext.cs ==========
+using CarRental.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace CarRental.Data;
+
+public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+{
+    public DbSet<Car> Cars => Set<Car>();
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<Rental> Rentals => Set<Rental>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Car>(entity =>
+        {
+            entity.Property(e => e.Brand).HasMaxLength(100);
+            entity.Property(e => e.Model).HasMaxLength(100);
+            entity.Property(e => e.DailyRate).HasPrecision(10, 2);
+            entity.Property(e => e.Faults).HasMaxLength(200);
+            entity.Property(e => e.ImageContentType).HasMaxLength(100);
+            entity.Property(e => e.ImageFileName).HasMaxLength(200);
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.Property(e => e.Username).HasMaxLength(100);
+            entity.Property(e => e.PasswordHash).HasMaxLength(100);
+            entity.HasIndex(e => e.Username).IsUnique();
+        });
+
+        modelBuilder.Entity<Rental>(entity =>
+        {
+            entity.HasOne(r => r.Car)
+                  .WithMany()
+                  .HasForeignKey(r => r.CarId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.User)
+                  .WithMany()
+                  .HasForeignKey(r => r.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(e => e.TotalCost).HasPrecision(10, 2);
+        });
+    }
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Data\DbSeeder.cs ==========
+using CarRental.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace CarRental.Data;
+
+public static class DbSeeder
+{
+    public static async Task SeedAsync(AppDbContext dbContext, bool enable)
+    {
+        if (!enable)
+            return;
+
+        if (!await dbContext.Cars.AnyAsync())
+        {
+            var (toyotaData, toyotaType, toyotaName) = TryLoadImage("toyota_corolla.jpg");
+            var (skodaData, skodaType, skodaName) = TryLoadImage("skoda_octavia.jpg");
+            var (vwData, vwType, vwName) = TryLoadImage("volkswagen_golf.jpg");
+            var (kiaData, kiaType, kiaName) = TryLoadImage("kia_sportage.jpg");
+
+            dbContext.Cars.AddRange(
+                new Car
+                {
+                    Brand = "Toyota",
+                    Model = "Corolla",
+                    Year = 2021,
+                    DailyRate = 129.00m,
+                    IsAvailable = true,
+                    Mileage = 45000,
+                    Faults = "",
+                    ImageData = toyotaData,
+                    ImageContentType = toyotaType,
+                    ImageFileName = toyotaName
+                },
+                new Car
+                {
+                    Brand = "Skoda",
+                    Model = "Octavia",
+                    Year = 2022,
+                    DailyRate = 149.00m,
+                    IsAvailable = true,
+                    Mileage = 22000,
+                    Faults = "",
+                    ImageData = skodaData,
+                    ImageContentType = skodaType,
+                    ImageFileName = skodaName
+                },
+                new Car
+                {
+                    Brand = "Volkswagen",
+                    Model = "Golf",
+                    Year = 2020,
+                    DailyRate = 119.00m,
+                    IsAvailable = false,
+                    Mileage = 78000,
+                    Faults = "Minor scratch on bumper",
+                    ImageData = vwData,
+                    ImageContentType = vwType,
+                    ImageFileName = vwName
+                },
+                new Car
+                {
+                    Brand = "Kia",
+                    Model = "Sportage",
+                    Year = 2023,
+                    DailyRate = 189.00m,
+                    IsAvailable = true,
+                    Mileage = 8500,
+                    Faults = "",
+                    ImageData = kiaData,
+                    ImageContentType = kiaType,
+                    ImageFileName = kiaName
+                }
+            );
+            await dbContext.SaveChangesAsync();
+        }
+
+        if (!await dbContext.Users.AnyAsync())
+        {
+            dbContext.Users.AddRange(
+                new User { Username = "admin", PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"), Role = UserRole.Admin },
+                new User { Username = "customer", PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"), Role = UserRole.Customer }
+            );
+            await dbContext.SaveChangesAsync();
+        }
+    }
+
+    private static (byte[]? data, string? contentType, string? fileName) TryLoadImage(string fileName)
+    {
+        string imagePath = Path.Combine(AppContext.BaseDirectory, "Data", "images", fileName);
+        if (!File.Exists(imagePath))
+            return (null, null, null);
+
+        string extension = Path.GetExtension(imagePath).ToLowerInvariant();
+        string contentType = extension switch
+        {
+            ".jpg" => "image/jpeg",
+            ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            _ => "application/octet-stream"
+        };
+
+        return (File.ReadAllBytes(imagePath), contentType, Path.GetFileName(imagePath));
+    }
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Models\Car.cs ==========
+namespace CarRental.Models;
+
+public sealed class Car
+{
+    public int Id { get; set; }
+    public string Brand { get; set; } = string.Empty;
+    public string Model { get; set; } = string.Empty;
+    public int Year { get; set; }
+    public decimal DailyRate { get; set; }
+    public bool IsAvailable { get; set; } = true;
+    public int Mileage { get; set; }
+    public string Faults { get; set; } = string.Empty;
+    public byte[]? ImageData { get; set; }
+    public string? ImageContentType { get; set; }
+    public string? ImageFileName { get; set; }
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Models\Rental.cs ==========
+namespace CarRental.Models;
+
+public sealed class Rental
+{
+    public int Id { get; set; }
+    public int CarId { get; set; }
+    public int UserId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public DateTime? ReturnDate { get; set; }
+    public decimal TotalCost { get; set; }
+    public RentalStatus Status { get; set; } = RentalStatus.Active;
+
+    // Nawigacje
+    public Car? Car { get; set; }
+    public User? User { get; set; }
+}
+
+public enum RentalStatus
+{
+    Active,      // Wypożyczone, jeszcze nie zwrócone
+    Completed,   // Zwrócone
+    Cancelled    // Anulowane
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Models\User.cs ==========
+namespace CarRental.Models;
+
+public sealed class User
+{
+    public int Id { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
+    public UserRole Role { get; set; } = UserRole.Customer;
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Models\UserRole.cs ==========
+namespace CarRental.Models;
+
+public enum UserRole
+{
+    Customer,
+    Admin
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\Android\MainActivity.cs ==========
+using Android.App;
+using Android.Content.PM;
+using Android.OS;
+
+namespace CarRental;
+
+[Activity(Theme = "@style/Maui.SplashTheme", MainLauncher = true,
+    ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation | ConfigChanges.UiMode |
+                           ConfigChanges.ScreenLayout | ConfigChanges.SmallestScreenSize | ConfigChanges.Density)]
+public class MainActivity : MauiAppCompatActivity
+{
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\Android\MainApplication.cs ==========
+using Android.App;
+using Android.Runtime;
+
+namespace CarRental;
+
+[Application]
+public class MainApplication : MauiApplication
+{
+    public MainApplication(IntPtr handle, JniHandleOwnership ownership)
+        : base(handle, ownership)
+    {
+    }
+
+    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\iOS\AppDelegate.cs ==========
+using Foundation;
+
+namespace CarRental;
+
+[Register("AppDelegate")]
+public class AppDelegate : MauiUIApplicationDelegate
+{
+    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\iOS\Program.cs ==========
+using ObjCRuntime;
+using UIKit;
+
+namespace CarRental;
+
+public class Program
+{
+    // This is the main entry point of the application.
+    static void Main(string[] args)
+    {
+        // if you want to use a different Application Delegate class from "AppDelegate"
+        // you can specify it here.
+        UIApplication.Main(args, null, typeof(AppDelegate));
+    }
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\MacCatalyst\AppDelegate.cs ==========
+using Foundation;
+
+namespace CarRental;
+
+[Register("AppDelegate")]
+public class AppDelegate : MauiUIApplicationDelegate
+{
+    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\MacCatalyst\Program.cs ==========
+using ObjCRuntime;
+using UIKit;
+
+namespace CarRental;
+
+public class Program
+{
+    // This is the main entry point of the application.
+    static void Main(string[] args)
+    {
+        // if you want to use a different Application Delegate class from "AppDelegate"
+        // you can specify it here.
+        UIApplication.Main(args, null, typeof(AppDelegate));
+    }
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\Windows\App.xaml ==========
+<maui:MauiWinUIApplication
+    x:Class="CarRental.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:maui="using:Microsoft.Maui"
+    xmlns:local="using:CarRental.WinUI">
+
+</maui:MauiWinUIApplication>
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Platforms\Windows\App.xaml.cs ==========
+using Microsoft.UI.Xaml;
+
+// To learn more about WinUI, the WinUI project structure,
+// and more about our project templates, see: http://aka.ms/winui-project-info.
+
+namespace CarRental.WinUI;
+
+/// <summary>
+/// Provides application-specific behavior to supplement the default Application class.
+/// </summary>
+public partial class App : MauiWinUIApplication
+{
+    /// <summary>
+    /// Initializes the singleton application object.  This is the first line of authored code
+    /// executed, and as such is the logical equivalent of main() or WinMain().
+    /// </summary>
+    public App()
+    {
+        this.InitializeComponent();
+    }
+
+    protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Properties\launchSettings.json ==========
+{
+  "profiles": {
+    "Windows Machine": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Services\AdminService.cs ==========
+using CarRental.Data;
+using CarRental.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace CarRental.Services;
+
+public sealed class AdminService
+{
+    private readonly IDbContextFactory<AppDbContext> _dbFactory; 
+    
+    public AdminService(IDbContextFactory<AppDbContext> dbFactory)
+    {
+        _dbFactory = dbFactory;
+    }
+
+    public async Task<List<Car>> GetAllCarsAsync()
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        return await db.Cars.AsNoTracking().OrderBy(c => c.Id).ToListAsync();
+    }
+
+    public async Task<string?> AddCarAsync(string brand, string model, int year, decimal dailyRate, bool isAvailable,
+        int mileage, string faults, byte[]? imageData, string? imageContentType, string? imageFileName)
+    {
+        if (string.IsNullOrWhiteSpace(brand) || string.IsNullOrWhiteSpace(model))
+            return "Brand and Model are required.";
+        if (year < 1900 || year > DateTime.Now.Year + 1)
+            return "Please enter a valid year.";
+        if (dailyRate <= 0)
+            return "Daily rate must be greater than zero.";
+        if (mileage < 0)
+            return "Mileage cannot be negative.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        db.Cars.Add(new Car
+        {
+            Brand = brand.Trim(),
+            Model = model.Trim(),
+            Year = year,
+            DailyRate = dailyRate,
+            IsAvailable = isAvailable,
+            Mileage = mileage,
+            Faults = faults.Trim(),
+            ImageData = imageData,
+            ImageContentType = imageContentType,
+            ImageFileName = imageFileName
+        });
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    public async Task<string?> UpdateCarAsync(int carId, string brand, string model, int year, decimal dailyRate,
+        int mileage, string faults, byte[]? imageData, string? imageContentType, string? imageFileName)
+    {
+        if (string.IsNullOrWhiteSpace(brand) || string.IsNullOrWhiteSpace(model))
+            return "Brand and Model are required.";
+        if (year < 1900 || year > DateTime.Now.Year + 1)
+            return "Please enter a valid year.";
+        if (dailyRate <= 0)
+            return "Daily rate must be greater than zero.";
+        if (mileage < 0)
+            return "Mileage cannot be negative.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        Car? car = await db.Cars.FindAsync(carId);
+        if (car is null) return "Car not found.";
+
+        car.Brand = brand.Trim();
+        car.Model = model.Trim();
+        car.Year = year;
+        car.DailyRate = dailyRate;
+        car.Mileage = mileage;
+        car.Faults = faults.Trim();
+
+        if (imageData is not null)
+        {
+            car.ImageData = imageData;
+            car.ImageContentType = imageContentType;
+            car.ImageFileName = imageFileName;
+        }
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    public async Task<string?> DeleteCarAsync(int carId)
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        Car? car = await db.Cars.FindAsync(carId);
+        if (car is null) return "Car not found.";
+        db.Cars.Remove(car);
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    public async Task<List<User>> GetAllUsersAsync()
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        return await db.Users.AsNoTracking().OrderBy(u => u.Id).ToListAsync();
+    }
+
+    public async Task<string?> DeleteUserAsync(int userId, int requestingUserId)
+    {
+        if (userId == requestingUserId)
+            return "You cannot delete your own account.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        User? user = await db.Users.FindAsync(userId);
+        if (user is null) return "User not found.";
+        db.Users.Remove(user);
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    public async Task<string?> AddUserAsync(string username, string password, UserRole role)
+    {
+        if (string.IsNullOrWhiteSpace(username) || username.Length < 3)
+            return "Username must be at least 3 characters.";
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
+            return "Password must be at least 6 characters.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        if (await db.Users.AnyAsync(u => u.Username == username))
+            return "That username is already taken.";
+
+        db.Users.Add(new User
+        {
+            Username = username.Trim(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = role
+        });
+        await db.SaveChangesAsync();
+        return null;
+    }
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Services\AuthService.cs ==========
+using CarRental.Data;
+using CarRental.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace CarRental.Services;
+
+public sealed class AuthService
+{
+    private readonly IDbContextFactory<AppDbContext> _dbFactory;
+
+    public User? CurrentUser { get; private set; }
+    public bool IsAuthenticated => CurrentUser is not null;
+    public event Action? AuthStateChanged;
+
+    public AuthService(IDbContextFactory<AppDbContext> dbFactory)
+    {
+        _dbFactory = dbFactory;
+    }
+
+    public async Task<string?> LoginAsync(string username, string password)
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            return "Username and password are required.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        
+        User? user = await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Username == username);
+
+        if (user is null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
+            return "Invalid username or password.";
+
+        CurrentUser = user;
+        AuthStateChanged?.Invoke();
+        return null;
+    }
+
+    public async Task<string?> RegisterAsync(string username, string password)
+    {
+        if (string.IsNullOrWhiteSpace(username) || username.Length < 3)
+            return "Username must be at least 3 characters.";
+
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
+            return "Password must be at least 6 characters.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+
+        if (await db.Users.AnyAsync(u => u.Username == username))
+            return "That username is already taken.";
+
+        User user = new User
+        {
+            Username = username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+            Role = UserRole.Customer
+        };
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        CurrentUser = user;
+        AuthStateChanged?.Invoke();
+        return null;
+    }
+
+    public void Logout()
+    {
+        CurrentUser = null;
+        AuthStateChanged?.Invoke();
+    }
+}
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Services\CarListFilter.cs ==========
+using CarRental.Models;
+
+namespace CarRental.Services;
+
+public sealed class CarFilterOptions
+{
+    public HashSet<string> SelectedBrands { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> SelectedModels { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> SelectedYears { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> SelectedStatuses { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public string MaxRate { get; set; } = string.Empty;
+}
+
+public static class CarListFilter
+{
+    public static List<Car> ApplySearchAndFilters(List<Car> source, string searchQuery, CarFilterOptions options)
+    {
+        List<Car> searched = ApplySearch(source, searchQuery);
+        return ApplyFilters(searched, options);
+    }
+
+    public static List<Car> ApplySearch(List<Car> source, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return source;
+
+        string q = query.Trim();
+        return source.Where(car => MatchesQuery(car, q)).ToList();
+    }
+
+    public static List<Car> ApplyFilters(List<Car> source, CarFilterOptions options)
+    {
+        IEnumerable<Car> query = source;
+
+        if (options.SelectedBrands.Count > 0)
+            query = query.Where(car => options.SelectedBrands.Contains(car.Brand));
+
+        if (options.SelectedModels.Count > 0)
+            query = query.Where(car => options.SelectedModels.Contains(car.Model));
+
+        if (options.SelectedYears.Count > 0)
+            query = query.Where(car => options.SelectedYears.Contains(car.Year.ToString()));
+
+        if (options.SelectedStatuses.Count > 0)
+            query = query.Where(car => options.SelectedStatuses.Contains(car.IsAvailable ? "Available" : "Rented"));
+
+        if (decimal.TryParse(options.MaxRate, out decimal maxRate))
+            query = query.Where(car => car.DailyRate <= maxRate);
+
+        return query.ToList();
+    }
+
+    public static bool MatchesQuery(Car car, string query)
+    {
+        return ContainsIgnoreCase(car.Brand, query)
+               || ContainsIgnoreCase(car.Model, query)
+               || car.Year.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
+               || car.DailyRate.ToString("C").Contains(query, StringComparison.OrdinalIgnoreCase)
+               || car.DailyRate.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)
+               || ContainsIgnoreCase(car.IsAvailable ? "Available" : "Rented", query);
+    }
+
+    private static bool ContainsIgnoreCase(string? value, string query)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        return value.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\Services\RentalService.cs ==========
+using CarRental.Data;
+using CarRental.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace CarRental.Services;
+
+public sealed class RentalService
+{
+    private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    private readonly AuthService _authService;
+
+    public RentalService(IDbContextFactory<AppDbContext> dbFactory, AuthService authService)
+    {
+        _dbFactory = dbFactory;
+        _authService = authService;
+    }
+
+    // Pobierz wszystkie wypożyczenia bieżącego użytkownika
+    public async Task<List<Rental>> GetMyRentalsAsync()
+    {
+        if (_authService.CurrentUser == null)
+            return new List<Rental>();
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        return await db.Rentals
+            .Include(r => r.Car)
+            .Where(r => r.UserId == _authService.CurrentUser.Id)
+            .OrderByDescending(r => r.StartDate)
+            .ToListAsync();
+    }
+
+    // Pobierz wszystkie wypożyczenia (dla admina)
+    public async Task<List<Rental>> GetAllRentalsAsync()
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        return await db.Rentals
+            .Include(r => r.Car)
+            .Include(r => r.User)
+            .OrderByDescending(r => r.StartDate)
+            .ToListAsync();
+    }
+
+    // Pobierz aktywne wypożyczenia (admin)
+    public async Task<List<Rental>> GetActiveRentalsAsync()
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        return await db.Rentals
+            .Include(r => r.Car)
+            .Include(r => r.User)
+            .Where(r => r.Status == RentalStatus.Active)
+            .OrderBy(r => r.EndDate)
+            .ToListAsync();
+    }
+
+    // Wypożycz samochód
+    public async Task<string?> RentCarAsync(int carId, DateTime startDate, DateTime endDate)
+    {
+        // Walidacja
+        if (_authService.CurrentUser == null)
+            return "Musisz być zalogowany.";
+
+        if (startDate.Date < DateTime.Today)
+            return "Data rozpoczęcia nie może być w przeszłości.";
+
+        if (endDate.Date <= startDate.Date)
+            return "Data zakończenia musi być późniejsza niż data rozpoczęcia.";
+
+        if ((endDate.Date - startDate.Date).Days > 30)
+            return "Maksymalny okres wypożyczenia to 30 dni.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+
+        // Sprawdź czy samochód istnieje i jest dostępny
+        Car? car = await db.Cars.FindAsync(carId);
+        if (car == null)
+            return "Samochód nie istnieje.";
+
+        if (!car.IsAvailable)
+            return "Samochód jest już wypożyczony.";
+
+        // Sprawdź czy nie ma konfliktów terminów
+        bool hasConflict = await db.Rentals.AnyAsync(r =>
+            r.CarId == carId &&
+            r.Status == RentalStatus.Active &&
+            r.StartDate.Date <= endDate.Date &&
+            r.EndDate.Date >= startDate.Date);
+
+        if (hasConflict)
+            return "Samochód jest już zarezerwowany w tym terminie.";
+
+        // Oblicz koszt
+        int days = (endDate.Date - startDate.Date).Days;
+        decimal totalCost = days * car.DailyRate;
+
+        // Utwórz wypożyczenie
+        Rental rental = new Rental
+        {
+            CarId = carId,
+            UserId = _authService.CurrentUser.Id,
+            StartDate = startDate.Date,
+            EndDate = endDate.Date,
+            TotalCost = totalCost,
+            Status = RentalStatus.Active
+        };
+
+        // Zaktualizuj dostępność samochodu
+        car.IsAvailable = false;
+
+        db.Rentals.Add(rental);
+        await db.SaveChangesAsync();
+
+        return null; // Sukces
+    }
+
+    // Zwróć samochód
+    public async Task<string?> ReturnCarAsync(int rentalId)
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+
+        Rental? rental = await db.Rentals
+            .Include(r => r.Car)
+            .FirstOrDefaultAsync(r => r.Id == rentalId);
+
+        if (rental == null)
+            return "Wypożyczenie nie istnieje.";
+
+        if (rental.Status != RentalStatus.Active)
+            return "To wypożyczenie zostało już zakończone.";
+
+        // Sprawdź uprawnienia (admin lub właściciel)
+        if (_authService.CurrentUser?.Role != UserRole.Admin &&
+            rental.UserId != _authService.CurrentUser?.Id)
+            return "Nie masz uprawnień do zwrotu tego samochodu.";
+
+        rental.ReturnDate = DateTime.Now;
+        rental.Status = RentalStatus.Completed;
+
+        // Przywróć dostępność samochodu
+        if (rental.Car != null)
+            rental.Car.IsAvailable = true;
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    // Anuluj wypożyczenie (tylko dla admina lub przed rozpoczęciem)
+    public async Task<string?> CancelRentalAsync(int rentalId)
+    {
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+
+        Rental? rental = await db.Rentals
+            .Include(r => r.Car)
+            .FirstOrDefaultAsync(r => r.Id == rentalId);
+
+        if (rental == null)
+            return "Wypożyczenie nie istnieje.";
+
+        if (rental.Status != RentalStatus.Active)
+            return "To wypożyczenie nie może być anulowane.";
+
+        // Sprawdź uprawnienia
+        bool isAdmin = _authService.CurrentUser?.Role == UserRole.Admin;
+        bool isOwner = rental.UserId == _authService.CurrentUser?.Id;
+
+        if (!isAdmin && !isOwner)
+            return "Nie masz uprawnień do anulowania tego wypożyczenia.";
+
+        // Jeśli anuluje klient, może to zrobić tylko przed rozpoczęciem
+        if (!isAdmin && rental.StartDate.Date <= DateTime.Today)
+            return "Nie możesz anulować wypożyczenia, które już się rozpoczęło.";
+
+        rental.Status = RentalStatus.Cancelled;
+
+        // Przywróć dostępność samochodu
+        if (rental.Car != null)
+            rental.Car.IsAvailable = true;
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    // Przedłuż wypożyczenie (admin)
+    public async Task<string?> ExtendRentalAsync(int rentalId, DateTime newEndDate)
+    {
+        if (_authService.CurrentUser?.Role != UserRole.Admin)
+            return "Tylko administrator może przedłużać wypożyczenia.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+
+        Rental? rental = await db.Rentals
+            .Include(r => r.Car)
+            .FirstOrDefaultAsync(r => r.Id == rentalId);
+
+        if (rental == null)
+            return "Wypożyczenie nie istnieje.";
+
+        if (rental.Status != RentalStatus.Active)
+            return "To wypożyczenie nie jest aktywne.";
+
+        if (newEndDate.Date <= rental.EndDate.Date)
+            return "Nowa data zakończenia musi być późniejsza.";
+
+        if ((newEndDate.Date - rental.StartDate.Date).Days > 45)
+            return "Maksymalny łączny okres wypożyczenia to 45 dni.";
+
+        // Sprawdź konflikty
+        bool hasConflict = await db.Rentals.AnyAsync(r =>
+            r.CarId == rental.CarId &&
+            r.Id != rentalId &&
+            r.Status == RentalStatus.Active &&
+            r.StartDate.Date <= newEndDate.Date &&
+            r.EndDate.Date >= rental.EndDate.Date);
+
+        if (hasConflict)
+            return "Nowy termin koliduje z innym wypożyczeniem.";
+
+        // Oblicz dodatkowy koszt
+        int additionalDays = (newEndDate.Date - rental.EndDate.Date).Days;
+        if (rental.Car != null)
+        {
+            rental.TotalCost += additionalDays * rental.Car.DailyRate;
+        }
+
+        rental.EndDate = newEndDate.Date;
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\App.xaml ==========
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:CarRental"
+             x:Class="CarRental.App">
+    <Application.Resources>
+        <ResourceDictionary>
+
+            <!--
+                For information about styling .NET MAUI pages
+                please refer to the documentation:
+                https://go.microsoft.com/fwlink/?linkid=2282329
+            -->
+
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\App.xaml.cs ==========
+namespace CarRental;
+
+public partial class App : Application
+{
+    public App()
+    {
+        InitializeComponent();
+    }
+
+    protected override Window CreateWindow(IActivationState? activationState)
+    {
+        return new Window(new MainPage()) { Title = "CarRental" };
+    }
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\CarRental.csproj ==========
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+    <PropertyGroup>
+        <TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
+
+        <!-- Note for MacCatalyst:
+            The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
+            When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
+            The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
+            either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+        <!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+
+        <OutputType>Exe</OutputType>
+        <RootNamespace>CarRental</RootNamespace>
+        <UseMaui>true</UseMaui>
+        <SingleProject>true</SingleProject>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <EnableDefaultCssItems>false</EnableDefaultCssItems>
+        <Nullable>enable</Nullable>
+
+        <!-- Enable XAML source generation for faster build times and improved performance.
+             This generates C# code from XAML at compile time instead of runtime inflation.
+             To disable, remove this line.
+             For individual files, you can override by setting Inflator metadata:
+               <MauiXaml Update="MyPage.xaml" Inflator="Default" /> (reverts to defaults: Runtime for Debug, XamlC for Release)
+               <MauiXaml Update="MyPage.xaml" Inflator="Runtime" /> (force runtime inflation) -->
+        <MauiXamlInflator>SourceGen</MauiXamlInflator>
+
+        <!-- Display name -->
+        <ApplicationTitle>CarRental</ApplicationTitle>
+
+        <!-- App Identifier -->
+        <ApplicationId>com.companyname.carrental</ApplicationId>
+
+        <!-- Versions -->
+        <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+        <ApplicationVersion>1</ApplicationVersion>
+
+        <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+        <WindowsPackageType>None</WindowsPackageType>
+
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+        <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- App Icon -->
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+        <!-- Splash Screen -->
+        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+        <!-- Images -->
+        <MauiImage Include="Resources\Images\*" />
+        <MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
+
+        <!-- Custom Fonts -->
+        <MauiFont Include="Resources\Fonts\*" />
+
+        <!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+        <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="Data\images\**\*.*">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Remove="Components\RentalList.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="Components\RentalList.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.8" />
+        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+        <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    </ItemGroup>
+
+</Project>
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\MainPage.xaml ==========
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:CarRental"
+             xmlns:components="clr-namespace:CarRental.Components"
+             x:Class="CarRental.MainPage">
+
+    <BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
+        <BlazorWebView.RootComponents>
+            <RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
+        </BlazorWebView.RootComponents>
+    </BlazorWebView>
+
+</ContentPage>
+
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\MainPage.xaml.cs ==========
+namespace CarRental;
+
+public partial class MainPage : ContentPage
+{
+    public MainPage()
+    {
+        InitializeComponent();
+    }
+}
+
+
+========== Plik: C:\Users\48606\source\repos\studia-projekt-wypozyczalnia-samochodow\CarRental\CarRental\MauiProgram.cs ==========
+using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using CarRental.Data;
+using CarRental.Services;
+
+namespace CarRental;
+
+public static class MauiProgram
+{
+    public static MauiApp CreateMauiApp()
+    {
+        MauiAppBuilder builder = MauiApp.CreateBuilder();
+        builder
+            .UseMauiApp<App>()
+            .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
+
+        builder.Services.AddMauiBlazorWebView();
+
+        string dbPath = Path.Combine(FileSystem.AppDataDirectory, "carrental.db");
+
+        builder.Services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseSqlite($"Data Source={dbPath}"));
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseSqlite($"Data Source={dbPath}"));
+
+        builder.Services.AddSingleton<AuthService>();
+        builder.Services.AddSingleton<AdminService>();
+        builder.Services.AddSingleton<RentalService>();
+
+#if DEBUG
+        builder.Services.AddBlazorWebViewDeveloperTools();
+        builder.Logging.AddDebug();
+#endif
+
+        MauiApp app = builder.Build();
+
+        using (IServiceScope scope = app.Services.CreateScope())
+        {
+            AppDbContext dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+#if DEBUG
+            dbContext.Database.EnsureDeleted();
+#endif
+            dbContext.Database.EnsureCreated();
+            DbSeeder.SeedAsync(dbContext, enable: true).GetAwaiter().GetResult();
+        }
+
+        return app;
+    }
+}
+
