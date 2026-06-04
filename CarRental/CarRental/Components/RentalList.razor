@@ -31,11 +31,11 @@ else
             </p>
 
             <p>
-                Dni: @((rental.EndDate - rental.StartDate).Days)
+                Days: @((rental.EndDate - rental.StartDate).Days)
             </p>
 
             <p>
-                Koszt: @rental.TotalCost.ToString("C")
+                Cost: @rental.TotalCost.ToString("C")
             </p>
 
             <p>
@@ -59,12 +59,12 @@ else
                 <button class="btn btn-sm btn-warning me-1"
                         @onclick="() => CancelRental(rental.Id)"
                         disabled="@(rental.StartDate.Date <= DateTime.Today)">
-                    Anuluj
+                    Cancel
                 </button>
 
                 <button class="btn btn-sm btn-success"
                         @onclick="() => ReturnCar(rental.Id)">
-                    Zwróć
+                    Return
                 </button>
             }
         </div>
