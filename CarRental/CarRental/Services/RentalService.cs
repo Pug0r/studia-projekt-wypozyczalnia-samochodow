@@ -73,8 +73,8 @@ public sealed class RentalService
         bool hasConflict = await db.Rentals.AnyAsync(r =>
             r.CarId == carId &&
             r.Status == RentalStatus.Active &&
-            r.StartDate.Date <= endDate.Date &&
-            r.EndDate.Date >= startDate.Date);
+            r.StartDate.Date < endDate.Date &&
+            r.EndDate.Date > startDate.Date);
 
         if (hasConflict)
             return "Car is already booked for this period.";
@@ -133,8 +133,23 @@ public sealed class RentalService
         if (string.IsNullOrWhiteSpace(description))
             return "Defect description is required.";
 
-        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        const int maxPhotoSizeBytes = 2 * 1024 * 1024;
+        if (photoData is not null)
+        {
+            if (photoData.Length > maxPhotoSizeBytes)
+                return "Photo must be 2 MB or smaller.";
 
+            if (string.IsNullOrWhiteSpace(photoContentType) ||
+                !photoContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return "Only image files can be uploaded as defect photos.";
+        }
+        else
+        {
+            photoContentType = null;
+            photoFileName = null;
+        }
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
         Rental? rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == rentalId);
         if (rental == null)
             return "Rental does not exist.";
@@ -217,8 +232,8 @@ public sealed class RentalService
             r.CarId == rental.CarId &&
             r.Id != rentalId &&
             r.Status == RentalStatus.Active &&
-            r.StartDate.Date <= newEndDate.Date &&
-            r.EndDate.Date >= rental.EndDate.Date);
+            r.StartDate.Date < newEndDate.Date &&
+            r.EndDate.Date > rental.StartDate.Date);
 
         if (hasConflict)
             return "New end date conflicts with another rental.";
