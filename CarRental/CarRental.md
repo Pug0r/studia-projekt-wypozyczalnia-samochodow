@@ -22,6 +22,8 @@ Celem projektu jest demonstracja działającego systemu wypożyczalni samochodó
 - **Logowanie i rejestracja** — każdy nowy użytkownik może założyć konto i się zalogować.
 - **Przeglądanie floty** — zalogowany użytkownik widzi listę wszystkich samochodów z ich statusem dostępności i cennikiem. Użytkownik może wyszukiwać i filtrować dostępne samochody.
 - **Panel administratora** — administrator może dodawać, edytować i usuwać samochody oraz zarządzać kontami użytkowników.
+- **Rezerwacje i proces wypożyczeń** — zalogowany klient może wybrać zakres dat w kalendarzu, sprawdzić dostępność floty w danym terminie, a następnie przejść na dedykowaną podstronę podsumowania zamówienia (Checkout Page), aby sfinalizować bezpieczny wynajem.
+- **Zarządzanie rezerwacjami przez klienta** — użytkownik ma wgląd w historię swoich rezerwacji (aktywne, zakończone, anulowane) z możliwością zwrotu pojazdu lub anulowania rezerwacji przed jej rozpoczęciem.
 
 ### Użyte technologie
 
@@ -138,6 +140,25 @@ Aplikacja przechowuje dane w lokalnej bazie SQLite. Schemat tworzony jest automa
 - Cena za dobę musi być większa od zera.
 - Przebieg nie może być ujemny.
 
+### Tabela `Rentals` — wypożyczenia
+
+| Kolumna | Typ | Opis |
+|---|---|---|
+| `Id` | `INTEGER` (PK) | Unikalny identyfikator wypożyczenia |
+| `CarId` | `INTEGER` (FK) | Powiązanie z tabelą `Cars` (ON DELETE RESTRICT) |
+| `UserId` | `INTEGER` (FK) | Powiązanie z tabelą `Users` (ON DELETE RESTRICT) |
+| `StartDate` | `TEXT` / `DATETIME` | Data rozpoczęcia wynajmu |
+| `EndDate` | `TEXT` / `DATETIME` | Data zakończenia wynajmu |
+| `ReturnDate` | `TEXT` / `DATETIME` (nullable) | Faktyczna data zwrotu samochodu |
+| `TotalCost` | `NUMERIC` (10,2) | Całkowity koszt wynajmu (Dni × Stawka dzienna) |
+| `Status` | `INTEGER` | Status: `0` = Active, `1` = Completed, `2` = Cancelled |
+
+**Walidacja biznesowa (RentalService):**
+- Data rozpoczęcia nie może być z przeszłości.
+- Data zakończenia musi być późniejsza niż data rozpoczęcia.
+- Maksymalny jednorazowy okres rezerwacji to 30 dni.
+- System uniemożliwia rezerwację pojazdu, jeśli jego terminy nakładają się na inną aktywną rezerwację tego samego auta w bazie danych.
+
 ---
 
 ## 5. Instrukcja obsługi
@@ -179,3 +200,15 @@ Na stronie głównej dostępne są:
 - **Clear** — czyści wyszukiwanie, usuwa wszystkie zaznaczenia i zwija listy filtrów.
 
 Wyniki aktualizują się na bieżąco podczas wpisywania i zaznaczania opcji.
+
+### 5.4 Proces wypożyczania (Checkout)
+
+1. Na stronie głównej użytkownik wybiera w panelu filtrów zakres dat ("Date from" oraz "Date to") i klika **Szukaj pojazdów**. System automatycznie weryfikuje rezerwacje w bazie i oznacza auta jako `Available` lub `Rented` w tym konkretnym okresie.
+2. Po kliknięciu przycisku **Rent**, aplikacja nie otwiera okna modalnego, lecz bezpiecznie przekierowuje użytkownika na osobną podstronę pod adresem `/rent/{CarId}`, przekazując wybrane daty w parametrach URL (`Query String`).
+3. Na podstronie checkoutu użytkownik widzi pełne podsumowanie specyfikacji pojazdu, zdjęcie, wyliczoną automatycznie liczbę dni oraz całkowity koszt algorytmu. Po kliknięciu **Confirm rental**, rezerwacja zostaje zapisana.
+
+### 5.5 Moje wypożyczenia (My Rentals)
+
+Z poziomu menu bocznego zalogowany użytkownik ma dostęp do podstrony `/myrentals`:
+- Widzi tam pełną listę swoich rezerwacji wraz z podsumowaniem kosztów i statusem.
+- Jeśli rezerwacja ma status `Active`, użytkownik może kliknąć **Return** (co zwalnia pojazd i uzupełnia `ReturnDate`) lub **Cancel** (opcja anulowania jest aktywna tylko wtedy, gdy data rozpoczęcia rezerwacji jeszcze nie nadeszła).

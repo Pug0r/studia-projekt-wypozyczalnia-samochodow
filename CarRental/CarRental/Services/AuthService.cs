@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CarRental.Services;
 
-public sealed class AuthService
+public class AuthService
 {
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
 

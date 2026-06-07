@@ -1,0 +1,126 @@
+@using CarRental.Models
+@using CarRental.Services
+@inject RentalService RentalService
+@inject AuthService AuthService
+@inject IJSRuntime JSRuntime
+
+@if (rentals == null)
+{
+    <p>Loading...</p>
+}
+else if (!rentals.Any())
+{
+    <div>
+        <p>You don't have any rentals.</p>
+        <p>Go to the car list to rent something.</p>
+    </div>
+}
+else
+{
+    @foreach (var rental in rentals)
+    {
+        <div class="rental-item">
+            <p>
+                <strong>@($"{rental.Car?.Brand} {rental.Car?.Model}")</strong>
+            </p>
+
+            <p>
+                @rental.StartDate.ToString("yyyy-MM-dd")
+                -
+                @rental.EndDate.ToString("yyyy-MM-dd")
+            </p>
+
+            <p>
+                Days: @((rental.EndDate - rental.StartDate).Days)
+            </p>
+
+            <p>
+                Cost: @rental.TotalCost.ToString("C")
+            </p>
+
+            <p>
+                Status:
+                @if (rental.Status == RentalStatus.Active)
+                {
+                    <text>Active</text>
+                }
+                else if (rental.Status == RentalStatus.Completed)
+                {
+                    <text>Completed</text>
+                }
+                else if (rental.Status == RentalStatus.Cancelled)
+                {
+                    <text>Cancelled</text>
+                }
+            </p>
+
+            @if (rental.Status == RentalStatus.Active)
+            {
+                <button class="btn btn-sm btn-warning me-1"
+                        @onclick="() => CancelRental(rental.Id)"
+                        disabled="@(rental.StartDate.Date <= DateTime.Today)">
+                    Cancel
+                </button>
+
+                <button class="btn btn-sm btn-success"
+                        @onclick="() => ReturnCar(rental.Id)">
+                    Return
+                </button>
+            }
+        </div>
+    }
+}
+
+@code {
+    private List<Rental>? rentals;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRentals();
+    }
+
+    private async Task LoadRentals()
+    {
+        if (AuthService.IsAuthenticated)
+        {
+            rentals = await RentalService.GetMyRentalsAsync();
+        }
+        else
+        {
+            rentals = new List<Rental>();
+        }
+    }
+
+    private async Task CancelRental(int rentalId)
+    {
+        var result = await RentalService.CancelRentalAsync(rentalId);
+
+        if (result == null)
+        {
+            await LoadRentals();
+        }
+        else
+        {
+            await ShowMessage(result);
+        }
+    }
+
+    private async Task ReturnCar(int rentalId)
+    {
+        var result = await RentalService.ReturnCarAsync(rentalId);
+
+        if (result == null)
+        {
+            await LoadRentals();
+        }
+        else
+        {
+            await ShowMessage(result);
+        }
+    }
+
+    private async Task ShowMessage(string message)
+    {
+        await JSRuntime.InvokeVoidAsync("alert", message);
+    }
+}
