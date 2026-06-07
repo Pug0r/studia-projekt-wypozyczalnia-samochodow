@@ -54,6 +54,54 @@ else
                 }
             </p>
 
+            @if (rental.Defects.Count > 0)
+            {
+                <div class="alert alert-light border py-2">
+                    <strong>Reported defects by incident:</strong>
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                            <tr>
+                                <th>Incident</th>
+                                <th>Type</th>
+                                <th>Reported at</th>
+                                <th>Description</th>
+                                <th>Other party insurance</th>
+                                <th>Photo</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var incident in rental.Defects.OrderByDescending(d => d.ReportedAt).Select((defect, index) => new { defect, number = index + 1 }))
+                            {
+                                var defectPhotoUrl = ToDataUrl(incident.defect.PhotoData, incident.defect.PhotoContentType);
+                                <tr>
+                                    <td>#@incident.number</td>
+                                    <td>@GetDefectTypeLabel(incident.defect.Type)</td>
+                                    <td>@incident.defect.ReportedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>@incident.defect.Description</td>
+                                    <td>@(string.IsNullOrWhiteSpace(incident.defect.OtherPartyInsuranceNumber) ? "-" : incident.defect.OtherPartyInsuranceNumber)</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(defectPhotoUrl))
+                                        {
+                                            <img src="@defectPhotoUrl" alt="Reported defect photo" class="defect-photo-thumb" title="Click to enlarge" @onclick="() => ShowPhoto(defectPhotoUrl)" />
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(incident.defect.PhotoFileName))
+                                        {
+                                            @incident.defect.PhotoFileName
+                                        }
+                                        else
+                                        {
+                                            <span>-</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
             @if (rental.Status == RentalStatus.Active)
             {
                 <button class="btn btn-sm btn-warning me-1"
@@ -62,17 +110,106 @@ else
                     Cancel
                 </button>
 
+                <button class="btn btn-sm btn-outline-danger me-1"
+                        @onclick="() => ToggleDefectForm(rental.Id)">
+                    Report defect
+                </button>
+
                 <button class="btn btn-sm btn-success"
                         @onclick="() => ReturnCar(rental.Id)">
                     Return
                 </button>
+
+                @if (reportingRentalId == rental.Id)
+                {
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Report defect before return</h6>
+
+                            @if (defectFeedback.HasValue)
+                            {
+                                <div class="alert @(defectFeedback.Value.isError ? "alert-danger" : "alert-success") py-2">
+                                    @defectFeedback.Value.message
+                                </div>
+                            }
+
+                            <div class="mb-2">
+                                <label class="form-label">Defect type</label>
+                                <InputSelect class="form-select" @bind-Value="defectForm.Type">
+                                    <option value="@DefectType.RenterFault">Renter fault</option>
+                                    <option value="@DefectType.RoadAccident">Road accident</option>
+                                    <option value="@DefectType.UndisclosedAtRentalStart">Undisclosed before rental</option>
+                                </InputSelect>
+                            </div>
+
+                            <div class="defect-form-field">
+                                <label class="form-label defect-field-label">Description</label>
+                                <div class="defect-form-field">
+                                    <InputTextArea class="form-control" @bind-Value="defectForm.Description" rows="3" />
+                                </div>                            
+                            </div>
+
+                            @if (defectForm.Type == DefectType.RoadAccident)
+                            {
+                                <div class="defect-form-field">
+                                    <label class="form-label defect-field-label">Other party insurance number</label>
+                                    <div class="defect-form-field">
+                                        <InputTextArea class="form-control" @bind-Value="defectForm.OtherPartyInsuranceNumber" rows="2" />
+                                    </div>  
+                                </div>
+                            }
+
+                            <div class="mb-2">
+                                <label class="form-label">Photo (optional)</label>
+                                <InputFile OnChange="OnDefectPhotoSelected" accept="image/*" />
+                                <div class="form-text">Max size 2 MB.</div>
+                                @if (!string.IsNullOrWhiteSpace(defectForm.PhotoFileName))
+                                {
+                                    <div class="form-text">Selected: @defectForm.PhotoFileName</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(defectPhotoPreviewDataUrl))
+                                {
+                                    <img src="@defectPhotoPreviewDataUrl" alt="Defect photo preview" class="defect-photo-preview" title="Click to enlarge" @onclick="() => ShowPhoto(defectPhotoPreviewDataUrl)" />
+                                }
+                            </div>
+
+                            <button class="btn btn-sm btn-danger me-1" @onclick="() => SubmitDefectReport(rental.Id)">
+                                Submit defect
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelDefectReport">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                }
             }
         </div>
     }
 }
 
+@if (!string.IsNullOrWhiteSpace(enlargedPhotoDataUrl))
+{
+    <div class="defect-photo-popup-backdrop" @onclick="ClosePhoto">
+        <div class="defect-photo-popup-pane" @onclick:stopPropagation="true">
+            <div class="defect-photo-popup-header">
+                <strong>Defect photo</strong>
+                <button type="button" class="defect-photo-popup-close" @onclick="ClosePhoto">Close</button>
+            </div>
+            <div class="defect-photo-popup-body">
+                <img src="@enlargedPhotoDataUrl" alt="Enlarged defect photo" />
+            </div>
+        </div>
+    </div>
+}
+
 @code {
+    private const long MaxDefectPhotoSizeBytes = 2 * 1024 * 1024;
     private List<Rental>? rentals;
+    private int? reportingRentalId;
+    private DefectFormModel defectForm = new();
+    private string? defectPhotoPreviewDataUrl;
+    private string? enlargedPhotoDataUrl;
+    private (bool isError, string message)? defectFeedback;
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,6 +248,9 @@ else
 
         if (result == null)
         {
+            if (reportingRentalId == rentalId)
+                CancelDefectReport();
+
             await LoadRentals();
         }
         else
@@ -119,8 +259,111 @@ else
         }
     }
 
+    private void ToggleDefectForm(int rentalId)
+    {
+        if (reportingRentalId == rentalId)
+        {
+            CancelDefectReport();
+            return;
+        }
+
+        reportingRentalId = rentalId;
+        defectForm = new DefectFormModel();
+        defectPhotoPreviewDataUrl = null;
+        defectFeedback = null;
+    }
+
+    private void CancelDefectReport()
+    {
+        reportingRentalId = null;
+        defectForm = new DefectFormModel();
+        defectPhotoPreviewDataUrl = null;
+        defectFeedback = null;
+    }
+
+    private async Task SubmitDefectReport(int rentalId)
+    {
+        string? result = await RentalService.ReportDefectAsync(
+            rentalId,
+            defectForm.Type,
+            defectForm.Description,
+            defectForm.OtherPartyInsuranceNumber,
+            defectForm.PhotoData,
+            defectForm.PhotoContentType,
+            defectForm.PhotoFileName);
+
+        if (result == null)
+        {
+            defectFeedback = (false, "Defect reported successfully.");
+            defectForm = new DefectFormModel();
+            defectPhotoPreviewDataUrl = null;
+            await LoadRentals();
+        }
+        else
+        {
+            defectFeedback = (true, result);
+        }
+    }
+
+    private async Task OnDefectPhotoSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+            return;
+
+        if (file.Size > MaxDefectPhotoSizeBytes)
+        {
+            defectFeedback = (true, "Photo must be 2 MB or smaller.");
+            return;
+        }
+
+        await using var stream = file.OpenReadStream(MaxDefectPhotoSizeBytes);
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer);
+
+        defectForm.PhotoData = buffer.ToArray();
+        defectForm.PhotoContentType = file.ContentType;
+        defectForm.PhotoFileName = file.Name;
+        defectPhotoPreviewDataUrl = ToDataUrl(defectForm.PhotoData, defectForm.PhotoContentType);
+        defectFeedback = null;
+    }
+
+    private static string GetDefectTypeLabel(DefectType type) => type switch
+    {
+        DefectType.RenterFault => "Renter fault",
+        DefectType.RoadAccident => "Road accident",
+        DefectType.UndisclosedAtRentalStart => "Undisclosed before rental",
+        _ => type.ToString()
+    };
+
+    private static string? ToDataUrl(byte[]? data, string? contentType)
+    {
+        if (data is null || string.IsNullOrWhiteSpace(contentType))
+            return null;
+
+        return $"data:{contentType};base64,{Convert.ToBase64String(data)}";
+    }
+
+    private void ShowPhoto(string? photoDataUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(photoDataUrl))
+            enlargedPhotoDataUrl = photoDataUrl;
+    }
+
+    private void ClosePhoto() => enlargedPhotoDataUrl = null;
+
     private async Task ShowMessage(string message)
     {
         await JSRuntime.InvokeVoidAsync("alert", message);
+    }
+
+    private sealed class DefectFormModel
+    {
+        public DefectType Type { get; set; } = DefectType.RenterFault;
+        public string Description { get; set; } = string.Empty;
+        public string? OtherPartyInsuranceNumber { get; set; }
+        public byte[]? PhotoData { get; set; }
+        public string? PhotoContentType { get; set; }
+        public string? PhotoFileName { get; set; }
     }
 }

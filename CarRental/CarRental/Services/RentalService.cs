@@ -23,6 +23,7 @@ public sealed class RentalService
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
         return await db.Rentals
             .Include(r => r.Car)
+            .Include(r => r.Defects)
             .Where(r => r.UserId == _authService.CurrentUser.Id)
             .OrderByDescending(r => r.StartDate)
             .ToListAsync();
@@ -127,6 +128,43 @@ public sealed class RentalService
 
         if (rental.Car != null)
             rental.Car.IsAvailable = true;
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    public async Task<string?> ReportDefectAsync(int rentalId, DefectType type, string description,
+        string? otherPartyInsuranceNumber, byte[]? photoData, string? photoContentType, string? photoFileName)
+    {
+        if (_authService.CurrentUser == null)
+            return "You must be logged in.";
+
+        if (string.IsNullOrWhiteSpace(description))
+            return "Defect description is required.";
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+
+        Rental? rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == rentalId);
+        if (rental == null)
+            return "Rental does not exist.";
+
+        if (rental.UserId != _authService.CurrentUser.Id)
+            return "You do not have permission to report a defect for this rental.";
+
+        if (rental.Status != RentalStatus.Active)
+            return "Defects can only be reported before returning the car.";
+
+        db.RentalDefects.Add(new RentalDefect
+        {
+            RentalId = rentalId,
+            Type = type,
+            Description = description.Trim(),
+            OtherPartyInsuranceNumber = type == DefectType.RoadAccident ? otherPartyInsuranceNumber?.Trim() : null,
+            ReportedAt = DateTime.Now,
+            PhotoData = photoData,
+            PhotoContentType = photoContentType,
+            PhotoFileName = photoFileName
+        });
 
         await db.SaveChangesAsync();
         return null;

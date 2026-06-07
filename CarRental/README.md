@@ -31,6 +31,6 @@ TODO:
 - [x] role: admin i user, dodawanie userow i samochodow - MM
 - [x] wyszukiwanie i filtrowanie samochodow z listy - AP
 - [ ] wypozyczenie samochodu, historia wypozyczen - KW
-- [ ] zwracanie samochodu, zglaszanie usterek - BB
+- [x] zglaszanie usterek przed zwrotem samochodu - BB
  
 Pamietajcie o testach + aktualizacji opisu CarRental.md. 
