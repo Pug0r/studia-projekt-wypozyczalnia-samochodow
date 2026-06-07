@@ -69,9 +69,6 @@ public sealed class RentalService
         if (car == null)
             return "Car does not exist.";
 
-        if (!car.IsAvailable)
-            return "Car is already rented.";
-
         bool hasConflict = await db.Rentals.AnyAsync(r =>
             r.CarId == carId &&
             r.Status == RentalStatus.Active &&
@@ -94,9 +91,6 @@ public sealed class RentalService
             TotalCost = totalCost,
             Status = RentalStatus.Active
         };
-
-
-        car.IsAvailable = false;
 
         db.Rentals.Add(rental);
         await db.SaveChangesAsync();
@@ -124,9 +118,6 @@ public sealed class RentalService
 
         rental.ReturnDate = DateTime.Now;
         rental.Status = RentalStatus.Completed;
-
-        if (rental.Car != null)
-            rental.Car.IsAvailable = true;
 
         await db.SaveChangesAsync();
         return null;
@@ -156,9 +147,6 @@ public sealed class RentalService
             return "You cannot cancel a rental that has already started.";
 
         rental.Status = RentalStatus.Cancelled;
-
-        if (rental.Car != null)
-            rental.Car.IsAvailable = true;
 
         await db.SaveChangesAsync();
         return null;
