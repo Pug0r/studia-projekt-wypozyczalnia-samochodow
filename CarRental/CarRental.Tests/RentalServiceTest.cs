@@ -174,4 +174,146 @@ public sealed class RentalServiceTests : IDisposable
         Assert.Equal(RentalStatus.Cancelled, updatedRental.Status);
         Assert.False(updatedCar.IsAvailable);
     }
+
+    [Fact]
+    public async Task ReportDefectAsync_ActiveOwnRental_CreatesDefect()
+    {
+        await authService.RegisterAsync("customer1", "Password123");
+        await SeedCarAsync(1, "Toyota", "Yaris", 100, false);
+        int currentUserId = authService.CurrentUser!.Id;
+        await SeedRentalAsync(1, currentUserId, DateTime.Today, DateTime.Today.AddDays(2), RentalStatus.Active);
+
+        int rentalId;
+        await using (var ctx = new AppDbContext(options))
+        {
+            rentalId = await ctx.Rentals.Where(r => r.CarId == 1).Select(r => r.Id).FirstAsync();
+        }
+
+        string? error = await service.ReportDefectAsync(rentalId, DefectType.RoadAccident,
+            "Damaged front bumper after road accident.", null, null, null, null);
+
+        Assert.Null(error);
+
+        await using var verify = new AppDbContext(options);
+        RentalDefect defect = Assert.Single(await verify.RentalDefects.ToListAsync());
+        Assert.Equal(rentalId, defect.RentalId);
+        Assert.Equal(DefectType.RoadAccident, defect.Type);
+        Assert.Equal("Damaged front bumper after road accident.", defect.Description);
+    }
+
+    [Fact]
+    public async Task ReportDefectAsync_CompletedRental_ReturnsError()
+    {
+        await authService.RegisterAsync("customer1", "Password123");
+        await SeedCarAsync(1, "Toyota", "Yaris", 100, true);
+        int currentUserId = authService.CurrentUser!.Id;
+        await SeedRentalAsync(1, currentUserId, DateTime.Today.AddDays(-2), DateTime.Today.AddDays(-1), RentalStatus.Completed);
+
+        int rentalId;
+        await using (var ctx = new AppDbContext(options))
+        {
+            rentalId = await ctx.Rentals.Where(r => r.CarId == 1).Select(r => r.Id).FirstAsync();
+        }
+
+        string? error = await service.ReportDefectAsync(rentalId, DefectType.RenterFault,
+            "Scratch on rear door.", null, null, null, null);
+
+        Assert.Equal("Defects can only be reported before returning the car.", error);
+
+        await using var verify = new AppDbContext(options);
+        Assert.Empty(await verify.RentalDefects.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ReportDefectAsync_OtherUsersRental_ReturnsError()
+    {
+        await authService.RegisterAsync("owner", "Password123");
+        int ownerId = authService.CurrentUser!.Id;
+        await SeedCarAsync(1, "Toyota", "Yaris", 100, false);
+        await SeedRentalAsync(1, ownerId, DateTime.Today, DateTime.Today.AddDays(2), RentalStatus.Active);
+        authService.Logout();
+        await authService.RegisterAsync("other", "Password123");
+
+        int rentalId;
+        await using (var ctx = new AppDbContext(options))
+        {
+            rentalId = await ctx.Rentals.Where(r => r.CarId == 1).Select(r => r.Id).FirstAsync();
+        }
+
+        string? error = await service.ReportDefectAsync(rentalId, DefectType.UndisclosedAtRentalStart,
+            "Existing windshield chip.", null, null, null, null);
+
+        Assert.Equal("You do not have permission to report a defect for this rental.", error);
+    }
+
+    [Fact]
+    public async Task ReportDefectAsync_WithPhoto_StoresPhotoData()
+    {
+        await authService.RegisterAsync("customer1", "Password123");
+        await SeedCarAsync(1, "Toyota", "Yaris", 100, false);
+        int currentUserId = authService.CurrentUser!.Id;
+        await SeedRentalAsync(1, currentUserId, DateTime.Today, DateTime.Today.AddDays(2), RentalStatus.Active);
+
+        int rentalId;
+        await using (var ctx = new AppDbContext(options))
+        {
+            rentalId = await ctx.Rentals.Where(r => r.CarId == 1).Select(r => r.Id).FirstAsync();
+        }
+
+        byte[] photo = { 1, 2, 3, 4 };
+        string? error = await service.ReportDefectAsync(rentalId, DefectType.RenterFault,
+            "Broken mirror.", null, photo, "image/png", "mirror.png");
+
+        Assert.Null(error);
+
+        await using var verify = new AppDbContext(options);
+        RentalDefect defect = Assert.Single(await verify.RentalDefects.ToListAsync());
+        Assert.Equal(photo, defect.PhotoData);
+        Assert.Equal("image/png", defect.PhotoContentType);
+        Assert.Equal("mirror.png", defect.PhotoFileName);
+    }
+
+    [Fact]
+    public async Task ReportDefectAsync_EmptyDescription_ReturnsError()
+    {
+        await authService.RegisterAsync("customer1", "Password123");
+        await SeedCarAsync(1, "Toyota", "Yaris", 100, false);
+        int currentUserId = authService.CurrentUser!.Id;
+        await SeedRentalAsync(1, currentUserId, DateTime.Today, DateTime.Today.AddDays(2), RentalStatus.Active);
+
+        int rentalId;
+        await using (var ctx = new AppDbContext(options))
+        {
+            rentalId = await ctx.Rentals.Where(r => r.CarId == 1).Select(r => r.Id).FirstAsync();
+        }
+
+        string? error = await service.ReportDefectAsync(rentalId, DefectType.RenterFault,
+            " ", null, null, null, null);
+
+        Assert.Equal("Defect description is required.", error);
+    }
+
+    [Fact]
+    public async Task ReportDefectAsync_RoadAccident_StoresOtherPartyInsuranceNumber()
+    {
+        await authService.RegisterAsync("customer1", "Password123");
+        await SeedCarAsync(1, "Toyota", "Yaris", 100, false);
+        int currentUserId = authService.CurrentUser!.Id;
+        await SeedRentalAsync(1, currentUserId, DateTime.Today, DateTime.Today.AddDays(2), RentalStatus.Active);
+
+        int rentalId;
+        await using (var ctx = new AppDbContext(options))
+        {
+            rentalId = await ctx.Rentals.Where(r => r.CarId == 1).Select(r => r.Id).FirstAsync();
+        }
+
+        string? error = await service.ReportDefectAsync(rentalId, DefectType.RoadAccident,
+            "Collision with another vehicle.", "OC-123456", null, null, null);
+
+        Assert.Null(error);
+
+        await using var verify = new AppDbContext(options);
+        RentalDefect defect = Assert.Single(await verify.RentalDefects.ToListAsync());
+        Assert.Equal("OC-123456", defect.OtherPartyInsuranceNumber);
+    }
 }

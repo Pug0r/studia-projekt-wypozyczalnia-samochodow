@@ -2,9 +2,9 @@
 @using CarRental.Models
 @using Microsoft.EntityFrameworkCore
 @using CarRental.Services
+@using CarRental.Services
 @using CarRental.Components
 @inject CarRental.Data.AppDbContext DbContext
-@inject RentalService RentalService
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
 
@@ -198,7 +198,6 @@ else
     private List<Car>? cars;
     private string searchQuery = string.Empty;
     private string filterMaxRate = string.Empty;
-    private Car? selectedCar;
 
     private DateTime searchStartDate = DateTime.Today;
     private DateTime searchEndDate = DateTime.Today.AddDays(1);
@@ -233,12 +232,13 @@ else
         DateTime startTarget = searchStartDate.Date;
         DateTime endTarget = searchEndDate.Date;
 
-        var rentedCarIds = await DbContext.Rentals
+        var rentedCarIds = (await DbContext.Rentals
             .Where(r => r.Status == RentalStatus.Active &&
-                        r.StartDate <= endTarget &&
-                        r.EndDate >= startTarget)
+                        r.StartDate < endTarget &&
+                        r.EndDate > startTarget)
             .Select(r => r.CarId)
-            .ToListAsync();
+            .ToListAsync())
+            .ToHashSet();
 
         var allCars = await DbContext.Cars.AsNoTracking().ToListAsync();
 
@@ -251,11 +251,6 @@ else
         InitializeFilterOptions(cars);
     }
 
-    private Task RedirectToMyRentals()
-    {
-        NavigationManager.NavigateTo("/myrentals");
-        return Task.CompletedTask;
-    }
 
     private void InitializeFilterOptions(List<Car> source)
     {

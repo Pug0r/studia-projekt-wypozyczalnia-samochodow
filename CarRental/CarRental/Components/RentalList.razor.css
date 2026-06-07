@@ -1,0 +1,87 @@
+.defect-form-field {
+    margin-bottom: 0.75rem;
+}
+
+.defect-field-label {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.defect-photo-thumb,
+.defect-photo-preview {
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    background: #fff;
+    object-fit: cover;
+    cursor: pointer;
+}
+
+.defect-photo-thumb {
+    max-width: 120px;
+    max-height: 80px;
+}
+
+.defect-photo-preview {
+    display: block;
+    max-width: 220px;
+    max-height: 140px;
+    margin-top: 0.5rem;
+    padding: 0.25rem;
+}
+
+.defect-photo-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.72);
+}
+
+.defect-photo-popup-pane {
+    width: min(900px, 92vw);
+    max-height: 92vh;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background: #fff;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.defect-photo-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.defect-photo-popup-close {
+    border: 1px solid var(--color-border);
+    border-radius: 0.375rem;
+    background: #fff;
+    color: var(--color-text-secondary);
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+}
+
+.defect-photo-popup-close:hover {
+    background: var(--color-bg-subtle);
+}
+
+.defect-photo-popup-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: calc(92vh - 58px);
+    padding: 1rem;
+}
+
+.defect-photo-popup-body img {
+    max-width: 100%;
+    max-height: calc(92vh - 90px);
+    object-fit: contain;
+}

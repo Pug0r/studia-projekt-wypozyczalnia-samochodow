@@ -21,6 +21,8 @@ Celem projektu jest demonstracja działającego systemu wypożyczalni samochodó
 
 - **Logowanie i rejestracja** — każdy nowy użytkownik może założyć konto i się zalogować.
 - **Przeglądanie floty** — zalogowany użytkownik widzi listę wszystkich samochodów z ich statusem dostępności i cennikiem. Użytkownik może wyszukiwać i filtrować dostępne samochody.
+- **Wypożyczenia i zwroty** — klient może wypożyczyć dostępny samochód, przeglądać swoje wypożyczenia i zwrócić aktywne wypożyczenie.
+- **Zgłaszanie usterek** — klient może zgłosić usterkę tylko dla aktywnego wypożyczenia, przed zwróceniem samochodu. Zgłoszenie może zawierać zdjęcie.
 - **Panel administratora** — administrator może dodawać, edytować i usuwać samochody oraz zarządzać kontami użytkowników.
 - **Rezerwacje i proces wypożyczeń** — zalogowany klient może wybrać zakres dat w kalendarzu, sprawdzić dostępność floty w danym terminie, a następnie przejść na dedykowaną podstronę podsumowania zamówienia (Checkout Page), aby sfinalizować bezpieczny wynajem.
 - **Zarządzanie rezerwacjami przez klienta** — użytkownik ma wgląd w historię swoich rezerwacji (aktywne, zakończone, anulowane) z możliwością zwrotu pojazdu lub anulowania rezerwacji przed jej rozpoczęciem.
@@ -145,6 +147,40 @@ Aplikacja przechowuje dane w lokalnej bazie SQLite. Schemat tworzony jest automa
 | Kolumna | Typ | Opis |
 |---|---|---|
 | `Id` | `INTEGER` (PK) | Unikalny identyfikator wypożyczenia |
+| `CarId` | `INTEGER` (FK) | Wypożyczony samochód |
+| `UserId` | `INTEGER` (FK) | Użytkownik, który wypożyczył samochód |
+| `StartDate` | `TEXT` / data | Początek wypożyczenia |
+| `EndDate` | `TEXT` / data | Planowany koniec wypożyczenia |
+| `ReturnDate` | `TEXT` / data | Faktyczny termin zwrotu, jeśli samochód został zwrócony |
+| `TotalCost` | `NUMERIC` (10,2) | Łączny koszt wypożyczenia |
+| `Status` | `INTEGER` | `0` = aktywne, `1` = zakończone, `2` = anulowane |
+
+### Tabela `RentalDefects` — zgłoszenia usterek
+
+| Kolumna | Typ | Opis |
+|---|---|---|
+| `Id` | `INTEGER` (PK) | Unikalny identyfikator zgłoszenia |
+| `RentalId` | `INTEGER` (FK) | Wypożyczenie, którego dotyczy zgłoszenie |
+| `Type` | `INTEGER` | Typ usterki: `0` = wina wypożyczającego, `1` = wypadek drogowy, `2` = usterka odkryta przez klienta i nieujawniona przy wypożyczeniu |
+| `Description` | `TEXT` (max 1000) | Opis usterki |
+| `OtherPartyInsuranceNumber` | `TEXT` (max 100) | Numer ubezpieczenia drugiej osoby uczestniczącej w wypadku drogowym |
+| `ReportedAt` | `TEXT` / data | Data i godzina zgłoszenia |
+| `PhotoData` | `BLOB` | Zdjęcie usterki (opcjonalnie) |
+| `PhotoContentType` | `TEXT` (max 100) | Typ MIME zdjęcia, np. `image/jpeg` |
+| `PhotoFileName` | `TEXT` (max 200) | Oryginalna nazwa pliku zdjęcia |
+
+**Walidacja zgłoszeń usterek:**
+- Zgłoszenie może dodać tylko zalogowany właściciel aktywnego wypożyczenia.
+- Zgłoszenie jest możliwe tylko przed zwróceniem samochodu.
+- Opis usterki jest wymagany.
+- Dla typu `Road accident` można podać numer ubezpieczenia drugiej osoby uczestniczącej w wypadku.
+- Zdjęcie jest opcjonalne i ma limit 2 MB.
+
+### Tabela `Rentals` — wypożyczenia
+
+| Kolumna | Typ | Opis |
+|---|---|---|
+| `Id` | `INTEGER` (PK) | Unikalny identyfikator wypożyczenia |
 | `CarId` | `INTEGER` (FK) | Powiązanie z tabelą `Cars` (ON DELETE RESTRICT) |
 | `UserId` | `INTEGER` (FK) | Powiązanie z tabelą `Users` (ON DELETE RESTRICT) |
 | `StartDate` | `TEXT` / `DATETIME` | Data rozpoczęcia wynajmu |
@@ -212,3 +248,15 @@ Wyniki aktualizują się na bieżąco podczas wpisywania i zaznaczania opcji.
 Z poziomu menu bocznego zalogowany użytkownik ma dostęp do podstrony `/myrentals`:
 - Widzi tam pełną listę swoich rezerwacji wraz z podsumowaniem kosztów i statusem.
 - Jeśli rezerwacja ma status `Active`, użytkownik może kliknąć **Return** (co zwalnia pojazd i uzupełnia `ReturnDate`) lub **Cancel** (opcja anulowania jest aktywna tylko wtedy, gdy data rozpoczęcia rezerwacji jeszcze nie nadeszła).
+
+### 5.6 Usterki
+
+W formularzu **Report defect** wybierz jeden z typów usterki:
+
+- **Renter fault** — usterka powstała z winy wypożyczającego.
+- **Road accident** — usterka powstała w wyniku wypadku drogowego.
+- **Undisclosed before rental** — usterka została odkryta przez wypożyczającego i nie była ujawniona podczas wypożyczania.
+
+Następnie wpisz opis usterki i opcjonalnie dodaj zdjęcie. Po kliknięciu **Submit defect** zgłoszenie pojawia się pod danym wypożyczeniem. Po kliknięciu **Return** formularz zgłaszania usterek nie jest już dostępny dla tego wypożyczenia.
+
+Jeżeli wybierzesz typ **Road accident**, pojawi się dodatkowe pole **Other party insurance number**, w którym można wpisać numer ubezpieczenia drugiej osoby uczestniczącej w wypadku. Zgłoszone usterki są wyświetlane w tabeli, gdzie każdy wiersz oznacza osobny incydent.

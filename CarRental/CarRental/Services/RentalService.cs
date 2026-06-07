@@ -23,6 +23,7 @@ public sealed class RentalService
         await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
         return await db.Rentals
             .Include(r => r.Car)
+            .Include(r => r.Defects)
             .Where(r => r.UserId == _authService.CurrentUser.Id)
             .OrderByDescending(r => r.StartDate)
             .ToListAsync();
@@ -72,8 +73,8 @@ public sealed class RentalService
         bool hasConflict = await db.Rentals.AnyAsync(r =>
             r.CarId == carId &&
             r.Status == RentalStatus.Active &&
-            r.StartDate.Date <= endDate.Date &&
-            r.EndDate.Date >= startDate.Date);
+            r.StartDate.Date < endDate.Date &&
+            r.EndDate.Date > startDate.Date);
 
         if (hasConflict)
             return "Car is already booked for this period.";
@@ -118,6 +119,58 @@ public sealed class RentalService
 
         rental.ReturnDate = DateTime.Now;
         rental.Status = RentalStatus.Completed;
+
+        await db.SaveChangesAsync();
+        return null;
+    }
+
+    public async Task<string?> ReportDefectAsync(int rentalId, DefectType type, string description,
+        string? otherPartyInsuranceNumber, byte[]? photoData, string? photoContentType, string? photoFileName)
+    {
+        if (_authService.CurrentUser == null)
+            return "You must be logged in.";
+
+        if (string.IsNullOrWhiteSpace(description))
+            return "Defect description is required.";
+
+        const int maxPhotoSizeBytes = 2 * 1024 * 1024;
+        if (photoData is not null)
+        {
+            if (photoData.Length > maxPhotoSizeBytes)
+                return "Photo must be 2 MB or smaller.";
+
+            if (string.IsNullOrWhiteSpace(photoContentType) ||
+                !photoContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                return "Only image files can be uploaded as defect photos.";
+        }
+        else
+        {
+            photoContentType = null;
+            photoFileName = null;
+        }
+
+        await using AppDbContext db = await _dbFactory.CreateDbContextAsync();
+        Rental? rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == rentalId);
+        if (rental == null)
+            return "Rental does not exist.";
+
+        if (rental.UserId != _authService.CurrentUser.Id)
+            return "You do not have permission to report a defect for this rental.";
+
+        if (rental.Status != RentalStatus.Active)
+            return "Defects can only be reported before returning the car.";
+
+        db.RentalDefects.Add(new RentalDefect
+        {
+            RentalId = rentalId,
+            Type = type,
+            Description = description.Trim(),
+            OtherPartyInsuranceNumber = type == DefectType.RoadAccident ? otherPartyInsuranceNumber?.Trim() : null,
+            ReportedAt = DateTime.Now,
+            PhotoData = photoData,
+            PhotoContentType = photoContentType,
+            PhotoFileName = photoFileName
+        });
 
         await db.SaveChangesAsync();
         return null;
@@ -179,8 +232,8 @@ public sealed class RentalService
             r.CarId == rental.CarId &&
             r.Id != rentalId &&
             r.Status == RentalStatus.Active &&
-            r.StartDate.Date <= newEndDate.Date &&
-            r.EndDate.Date >= rental.EndDate.Date);
+            r.StartDate.Date < newEndDate.Date &&
+            r.EndDate.Date > rental.StartDate.Date);
 
         if (hasConflict)
             return "New end date conflicts with another rental.";

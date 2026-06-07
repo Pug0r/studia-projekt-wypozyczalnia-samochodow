@@ -13,6 +13,7 @@ public sealed class Rental
 
     public Car? Car { get; set; }
     public User? User { get; set; }
+    public List<RentalDefect> Defects { get; set; } = new();
 }
 
 public enum RentalStatus

@@ -9,6 +9,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<User> Users => Set<User>();
 
     public DbSet<Rental> Rentals => Set<Rental>();
+    public DbSet<RentalDefect> RentalDefects => Set<RentalDefect>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                   .OnDelete(DeleteBehavior.Restrict);
 
             entity.Property(e => e.TotalCost).HasPrecision(10, 2);
+        });
+
+        modelBuilder.Entity<RentalDefect>(entity =>
+        {
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.OtherPartyInsuranceNumber).HasMaxLength(100);
+            entity.Property(e => e.PhotoContentType).HasMaxLength(100);
+            entity.Property(e => e.PhotoFileName).HasMaxLength(200);
+
+            entity.HasOne(d => d.Rental)
+                  .WithMany(r => r.Defects)
+                  .HasForeignKey(d => d.RentalId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
