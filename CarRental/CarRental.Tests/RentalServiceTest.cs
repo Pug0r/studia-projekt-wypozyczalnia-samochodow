@@ -108,14 +108,20 @@ public sealed class RentalServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RentCarAsync_CarIsAlreadyRentedFlagFalse_ReturnsError()
+    public async Task RentCarAsync_OverlappingRental_ReturnsError()
     {
         await authService.RegisterAsync("customer1", "Password123");
-        await SeedCarAsync(2, "BMW", "E60", 200, false);
+        await SeedCarAsync(2, "BMW", "E60", 200, true);
+        await SeedRentalAsync(
+            2,
+            authService.CurrentUser!.Id,
+            DateTime.Today.AddDays(2),
+            DateTime.Today.AddDays(5),
+            RentalStatus.Active);
 
-        string? error = await service.RentCarAsync(2, DateTime.Today, DateTime.Today.AddDays(2));
+        string? error = await service.RentCarAsync(2, DateTime.Today.AddDays(4), DateTime.Today.AddDays(6));
 
-        Assert.Equal("Car is already rented.", error);
+        Assert.Equal("Car is already booked for this period.", error);
     }
 
     [Fact]
@@ -135,7 +141,7 @@ public sealed class RentalServiceTests : IDisposable
         var rental = await ctx.Rentals.FirstOrDefaultAsync(r => r.CarId == 1);
 
         Assert.NotNull(car);
-        Assert.False(car.IsAvailable);
+        Assert.True(car.IsAvailable);
 
         Assert.NotNull(rental);
         Assert.Equal(RentalStatus.Active, rental.Status);
@@ -166,7 +172,7 @@ public sealed class RentalServiceTests : IDisposable
         var updatedCar = await ctxVerify.Cars.FirstAsync();
 
         Assert.Equal(RentalStatus.Cancelled, updatedRental.Status);
-        Assert.True(updatedCar.IsAvailable);
+        Assert.False(updatedCar.IsAvailable);
     }
 
     [Fact]
